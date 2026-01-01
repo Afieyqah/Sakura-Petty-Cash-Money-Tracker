@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "11199189138",
+    "project_id": "sakura-petty-money-tracker",
+    "storage_bucket": "sakura-petty-money-tracker.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:11199189138:android:9a5b2c861b1ed2a78e564b",
+        "android_client_info": {
+          "package_name": "com.example.selab_project"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBTfCLbTkvUW8yGyI0tTDG-1fobfXUT8lY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
