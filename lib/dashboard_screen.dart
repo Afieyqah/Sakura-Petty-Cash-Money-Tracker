@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
-import '../services/auth_service.dart';
-import 'welcome_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'login_and_authenthication/auth_service.dart';
+import 'login_and_authenthication/welcome_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -12,28 +12,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final _auth = AuthService();
-  double balance = 156.50;
-
-  final expenses = [
-    {
-      'title': 'Marker',
-      'amount': 6.30,
-      'date': 'October 20, 2025',
-      'icon': Icons.edit,
-    },
-    {
-      'title': 'Fuel',
-      'amount': 20.00,
-      'date': 'October 20, 2025',
-      'icon': Icons.local_gas_station,
-    },
-    {
-      'title': 'Banner printing',
-      'amount': 12.00,
-      'date': 'October 2, 2025',
-      'icon': Icons.print,
-    },
-  ];
+  final double _initialBudget = 200.00;
 
   final tips = [
     "Prepare a Budget and Abide by it",
@@ -59,12 +38,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  List<PieChartSectionData> _buildChartSections() {
-    return [
-      PieChartSectionData(value: 6.3, color: Colors.green, title: 'Marker'),
-      PieChartSectionData(value: 20.0, color: Colors.blue, title: 'Fuel'),
-      PieChartSectionData(value: 12.0, color: Colors.purple, title: 'Banner'),
-    ];
+  // 🔎 Balance card using Firestore
+  Widget _buildBalanceCard() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('expenses').snapshots(),
+      builder: (context, snapshot) {
+        double totalSpent = 0.0;
+        if (snapshot.hasData) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            double amount =
+                double.tryParse(data['amount']?.toString() ?? '0') ?? 0.0;
+            totalSpent += amount;
+          }
+        }
+        double remaining = _initialBudget - totalSpent;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.85),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              const Text(
+                'Available Balance',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'RM ${remaining.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Total Spent: RM ${totalSpent.toStringAsFixed(2)}',
+                style: const TextStyle(color: Colors.pink, fontSize: 14),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 🔎 Expenses list using Firestore
+  Widget _buildExpenseList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('expenses').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final docs = snapshot.data!.docs;
+        if (docs.isEmpty) {
+          return const Center(child: Text("No expenses found."));
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: docs.length,
+          itemBuilder: (context, i) {
+            final data = docs[i].data() as Map<String, dynamic>;
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.payments, color: Colors.pink),
+                title: Text(data['remark'] ?? 'No Remark'),
+                subtitle: Text(data['date'] ?? ''),
+                trailing: Text(
+                  'RM ${data['amount']?.toString() ?? '0.00'}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -86,47 +138,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           children: [
             const SizedBox(height: 12),
-            // Balance + chart
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.85),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Available Balance',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'RM${balance.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 160,
-                      child: PieChart(
-                        PieChartData(sections: _buildChartSections()),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              child: _buildBalanceCard(),
             ),
             const SizedBox(height: 12),
             // Tip of the day
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GestureDetector(
-                onTap: _nextTip, // tap to cycle tips
+                onTap: _nextTip,
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -146,31 +167,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 12),
             // Expenses list
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: expenses.length,
-                itemBuilder: (context, i) {
-                  final e = expenses[i];
-                  return Card(
-                    child: ListTile(
-                      leading: Icon(e['icon'] as IconData, color: Colors.pink),
-                      title: Text(e['title'] as String),
-                      subtitle: Text(e['date'] as String),
-                      trailing: Text(
-                        'RM ${(e['amount'] as double).toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            // Bottom nav (updated)
+            Expanded(child: _buildExpenseList()),
+            // Bottom nav (larger)
             Container(
-              padding: const EdgeInsets.symmetric(
-                vertical: 16,
-              ), // ⬆️ taller bar
+              padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.95),
                 boxShadow: [
@@ -203,7 +203,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                   CircleAvatar(
-                    radius: 28, // ⬆️ bigger add button
+                    radius: 28,
                     backgroundColor: Colors.pink,
                     child: const Icon(Icons.add, color: Colors.white, size: 28),
                   ),

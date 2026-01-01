@@ -8,7 +8,11 @@ plugins {
 
 dependencies{
    
-    implementation ("com.google.firebase:firebase-analytics:22.1.2") 
+    implementation ("com.google.firebase:firebase-analytics:22.1.2")
+    implementation("androidx.core:core-ktx:1.12.0") 
+    implementation("androidx.appcompat:appcompat:1.6.1") 
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("com.google.firebase:firebase-auth-ktx:22.3.0")  
     
     // OR, if you just want to run the app now, comment it out:
     // implementation 'com.google.firebase:firebase-analytics'
