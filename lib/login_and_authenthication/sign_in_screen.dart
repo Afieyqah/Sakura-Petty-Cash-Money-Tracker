@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'auth_service.dart';
 import 'register_screen.dart';
 import 'welcome_screen2.dart';
+import '../dashboard_screen.dart'; // 👈 add your dashboard screen import
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -41,10 +42,28 @@ class _SignInScreenState extends State<SignInScreen> {
     setState(() => _loading = false);
 
     if (error == null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const WelcomeScreen2()),
-      );
+      // ✅ Get current user UID
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        // ✅ Fetch role from Firestore
+        final role = await _auth.getUserRole(uid);
+
+        if (!mounted) return;
+
+        if (role != null) {
+          // ✅ Navigate based on role
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => DashboardScreen(role: role)),
+          );
+        } else {
+          // fallback if no role found
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const WelcomeScreen2()),
+          );
+        }
+      }
     } else {
       setState(() => _error = error);
     }
@@ -82,7 +101,6 @@ class _SignInScreenState extends State<SignInScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // 👇 This is your JPEG image ABOVE the form
             Image.asset(
               'assets/images/app_icon.png',
               height: 180,
@@ -103,7 +121,6 @@ class _SignInScreenState extends State<SignInScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Email field
             TextField(
               controller: _emailCtrl,
               decoration: const InputDecoration(labelText: "Email"),
@@ -111,7 +128,6 @@ class _SignInScreenState extends State<SignInScreen> {
             ),
             const SizedBox(height: 12),
 
-            // Password field
             TextField(
               controller: _passCtrl,
               decoration: const InputDecoration(labelText: "Password"),
@@ -123,7 +139,6 @@ class _SignInScreenState extends State<SignInScreen> {
               Text(_error, style: const TextStyle(color: Colors.red)),
             const SizedBox(height: 8),
 
-            // Login button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -139,7 +154,6 @@ class _SignInScreenState extends State<SignInScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Forgot password
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
@@ -148,7 +162,6 @@ class _SignInScreenState extends State<SignInScreen> {
               ),
             ),
 
-            // Register link
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

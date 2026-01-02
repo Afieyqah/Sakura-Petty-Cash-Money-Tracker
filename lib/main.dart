@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'login_and_authenthication/splash_screen.dart';
-import 'dashboard_screen.dart'; // 👈 import your dashboard
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,12 +24,8 @@ class PettyCashApp extends StatelessWidget {
       title: 'Youth 24+ Petty Cash Tracker',
       theme: theme,
       debugShowCheckedModeBanner: false,
-      // 👇 Start with SplashScreen, then navigate to Dashboard
+      // 👇 Start with SplashScreen, then AuthCheckScreen will decide the role
       home: const SplashScreen(),
-      routes: {
-        '/dashboard': (_) => const DashboardScreen(),
-        // you can add other screens here like '/welcome': (_) => const WelcomeScreen(),
-      },
     );
   }
 }

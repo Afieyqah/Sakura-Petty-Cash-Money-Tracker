@@ -37,18 +37,31 @@ class _CustomPinScreenState extends State<CustomPinScreen> {
       // Save new PIN
       await _auth.setPin(_pin);
       if (!mounted) return;
+
+      // Fetch role from Firestore
+      final uid = _auth.getUid(); // ✅ already non-null
+      final role = await _auth.getUserRole(uid);
+
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        MaterialPageRoute(
+          builder: (_) => DashboardScreen(role: role ?? "staff"),
+        ),
       );
     } else {
       // Verify existing PIN
       final ok = await _auth.verifyPin(_pin);
       if (!mounted) return;
       if (ok) {
+        // Fetch role from Firestore
+        final uid = _auth.getUid(); // ✅ already non-null
+        final role = await _auth.getUserRole(uid);
+
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+          MaterialPageRoute(
+            builder: (_) => DashboardScreen(role: role ?? "staff"),
+          ),
         );
       } else {
         setState(() {

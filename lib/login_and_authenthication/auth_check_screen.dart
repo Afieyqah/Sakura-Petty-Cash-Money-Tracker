@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'auth_service.dart';
-import '../dashboard_screen.dart';
+import '../dashboard_screen.dart'; // 👈 unified dashboard
 import 'custom_pin_screen.dart';
+import 'welcome_screen.dart'; // 👈 now used as fallback
 
 class AuthCheckScreen extends StatefulWidget {
   const AuthCheckScreen({super.key});
@@ -12,6 +14,7 @@ class AuthCheckScreen extends StatefulWidget {
 
 class _AuthCheckScreenState extends State<AuthCheckScreen> {
   final _auth = AuthService();
+  final _firebaseAuth = FirebaseAuth.instance;
 
   bool _checking = true;
   bool _hasFingerprint = false;
@@ -33,7 +36,6 @@ class _AuthCheckScreenState extends State<AuthCheckScreen> {
       _checking = false;
     });
 
-    // Auto‑try fingerprint immediately if available
     if (bio) {
       _tryBiometric();
     } else {
@@ -45,10 +47,7 @@ class _AuthCheckScreenState extends State<AuthCheckScreen> {
     final ok = await _auth.authenticateBiometric();
     if (!mounted) return;
     if (ok) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
-      );
+      _goRoleBasedDashboard();
     } else {
       _goPin();
     }
@@ -61,6 +60,38 @@ class _AuthCheckScreenState extends State<AuthCheckScreen> {
         builder: (_) => CustomPinScreen(requireSetup: !_hasPin),
       ),
     );
+  }
+
+  // 🔎 Unified role-based dashboard with WelcomeScreen fallback
+  Future<void> _goRoleBasedDashboard() async {
+    final user = _firebaseAuth.currentUser;
+    if (user != null) {
+      final role = await _auth.getUserRole(user.uid); // returns String?
+      if (!mounted) return;
+
+      if (role != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => DashboardScreen(role: role)),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Role not assigned")));
+      }
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("No user logged in")));
+    }
   }
 
   @override

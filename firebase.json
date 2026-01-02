@@ -1,1 +1,42 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"sakura-petty-money-tracker","appId":"1:11199189138:android:9a5b2c861b1ed2a78e564b","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"sakura-petty-money-tracker","configurations":{"android":"1:11199189138:android:9a5b2c861b1ed2a78e564b","ios":"1:11199189138:ios:88b882d05e8245b48e564b","macos":"1:11199189138:ios:88b882d05e8245b48e564b","web":"1:11199189138:web:a83d29e12b6295308e564b","windows":"1:11199189138:web:402a188968b831b28e564b"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "sakura-petty-money-tracker",
+          "appId": "1:11199189138:android:9a5b2c861b1ed2a78e564b",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "sakura-petty-money-tracker",
+          "configurations": {
+            "android": "1:11199189138:android:9a5b2c861b1ed2a78e564b",
+            "ios": "1:11199189138:ios:88b882d05e8245b48e564b",
+            "macos": "1:11199189138:ios:88b882d05e8245b48e564b",
+            "web": "1:11199189138:web:a83d29e12b6295308e564b",
+            "windows": "1:11199189138:web:402a188968b831b28e564b"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint"
+      ]
+    }
+  ]
+}

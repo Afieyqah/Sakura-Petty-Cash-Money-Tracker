@@ -1,8 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'auth_service.dart';
 import '../dashboard_screen.dart';
 
 class WelcomeScreen2 extends StatelessWidget {
   const WelcomeScreen2({super.key});
+
+  Future<void> _goToDashboard(BuildContext context) async {
+    final _auth = AuthService();
+
+    // ✅ Get current user UID
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? "";
+
+    // ✅ Fetch role from Firestore
+    final role = await _auth.getUserRole(uid);
+
+    if (!context.mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => DashboardScreen(role: role ?? "staff")),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +39,7 @@ class WelcomeScreen2 extends StatelessWidget {
           children: [
             // 👇 Image above the text
             Image.asset(
-              'assets/images/app_icon.png', // use your logo/banner image here
+              'assets/images/app_icon.png',
               height: 120,
               fit: BoxFit.contain,
             ),
@@ -42,10 +61,7 @@ class WelcomeScreen2 extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const DashboardScreen()),
-              ),
+              onPressed: () => _goToDashboard(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.pink,
                 foregroundColor: Colors.white,
