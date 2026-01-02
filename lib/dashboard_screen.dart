@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'login_and_authenthication/auth_service.dart';
 import 'login_and_authenthication/welcome_screen.dart';
 
@@ -85,6 +86,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // 🔎 Build chart sections dynamically from Firestore
+  List<PieChartSectionData> _buildChartSections(QuerySnapshot snapshot) {
+    final Map<String, double> categoryTotals = {};
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final category = data['category']?.toString() ?? 'Other';
+      final amount = double.tryParse(data['amount']?.toString() ?? '0') ?? 0.0;
+
+      categoryTotals[category] = (categoryTotals[category] ?? 0) + amount;
+    }
+
+    final colors = [
+      Colors.pink,
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+    ];
+    int colorIndex = 0;
+
+    return categoryTotals.entries.map((entry) {
+      final sectionColor = colors[colorIndex % colors.length];
+      colorIndex++;
+      return PieChartSectionData(
+        value: entry.value,
+        title: entry.key,
+        color: sectionColor,
+        radius: 50,
+        titleStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      );
+    }).toList();
+  }
+
   // 🔎 Expenses list using Firestore
   Widget _buildExpenseList() {
     return StreamBuilder<QuerySnapshot>(
@@ -141,6 +180,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _buildBalanceCard(),
+            ),
+            const SizedBox(height: 12),
+            // Pie Chart
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('expenses')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const SizedBox(
+                      height: 160,
+                      child: Center(child: Text("No chart data")),
+                    );
+                  }
+                  return SizedBox(
+                    height: 160,
+                    child: PieChart(
+                      PieChartData(
+                        sections: _buildChartSections(snapshot.data!),
+                        centerSpaceRadius: 30,
+                        sectionsSpace: 2,
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
             const SizedBox(height: 12),
             // Tip of the day

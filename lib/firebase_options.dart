@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'sakura-petty-money-tracker.firebasestorage.app',
     measurementId: 'G-3HKWTG1HWD',
   );
+
 }
