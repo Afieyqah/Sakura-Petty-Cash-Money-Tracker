@@ -1,24 +1,11 @@
-<<<<<<< HEAD
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AlertService {
   static Stream<QuerySnapshot> getAlerts(String userId) {
-    // Queries budgets where 'spent' is greater than 'amount'
+    // Mengambil data budget untuk diproses sebagai alert
     return FirebaseFirestore.instance
         .collection('budgets')
         .where('userId', isEqualTo: userId)
         .snapshots();
   }
-=======
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-class AlertService {
-  static Stream<QuerySnapshot> getAlerts(String userId) {
-    // Queries budgets where 'spent' is greater than 'amount'
-    return FirebaseFirestore.instance
-        .collection('budgets')
-        .where('userId', isEqualTo: userId)
-        .snapshots();
-  }
->>>>>>> ca32774 (	new file:   lib/account_dashboard/account_dashboard.dart)
 }
