@@ -10,9 +10,15 @@ class AccountDashboard extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
+      extendBodyBehindAppBar: true, // Allows background to show behind AppBar
       appBar: AppBar(
-        title: const Text("ACCOUNT DASHBOARD"),
+        title: const Text("Account Dashboard", style: TextStyle(color: Colors.black87)),
         elevation: 0,
+        backgroundColor: Colors.transparent, // Transparent to show the BG
+        leading: IconButton(
+          icon: const Icon(Icons.menu, color: Colors.black87),
+          onPressed: () {}, // Add drawer logic here if needed
+        ),
       ),
       body: Container(
         width: double.infinity,
@@ -23,7 +29,6 @@ class AccountDashboard extends StatelessWidget {
           ),
         ),
         child: StreamBuilder<QuerySnapshot>(
-          // Listen to accounts owned by this user
           stream: FirebaseFirestore.instance
               .collection('accounts')
               .where('userId', isEqualTo: user?.uid)
@@ -35,47 +40,88 @@ class AccountDashboard extends StatelessWidget {
 
             double totalNetWorth = 0;
             final docs = snapshot.data?.docs ?? [];
-            
-            // Calculate Total Net Worth
             for (var doc in docs) {
               totalNetWorth += (doc['balance'] as num).toDouble();
             }
 
-            return Column(
-              children: [
-                const SizedBox(height: 40),
-                const Text(
-                  "Net Worth",
-                  style: TextStyle(fontSize: 18, color: Colors.black54),
-                ),
-                Text(
-                  "RM ${totalNetWorth.toStringAsFixed(2)}",
-                  style: const TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.pink,
+            return SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // --- NET WORTH CARD ---
+                  Container(
+                    margin: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(24),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("Net Worth", style: TextStyle(fontSize: 18, color: Colors.black54)),
+                        const SizedBox(height: 8),
+                        Text(
+                          "RM ${totalNetWorth.toStringAsFixed(2)}",
+                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black87),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 30),
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: docs.length,
-                    itemBuilder: (context, index) {
-                      final account = docs[index].data() as Map<String, dynamic>;
-                      return _buildAccountTile(
-                        account['name'] ?? 'Account',
-                        (account['balance'] as num).toDouble(),
-                      );
-                    },
+
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    child: Text("Accounts", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
-                ),
-              ],
+
+                  // --- ACCOUNTS LIST ---
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: docs.length,
+                      itemBuilder: (context, index) {
+                        final account = docs[index].data() as Map<String, dynamic>;
+                        return _buildAccountTile(
+                          account['name'] ?? 'Account',
+                          (account['balance'] as num).toDouble(),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // --- BOTTOM BUTTONS ---
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        _buildNavButton(
+                          context, 
+                          "View Budget", 
+                          Icons.visibility, 
+                          const Color(0xFFFFE4E1), // Light pink
+                          '/view_budget'
+                        ),
+                        const SizedBox(height: 12),
+                        _buildNavButton(
+                          context, 
+                          "Budget List", 
+                          Icons.list_alt, 
+                          Colors.white.withOpacity(0.9),
+                          '/budget_list'
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         ),
       ),
-      // Button to add a new account (e.g., BSN, Cash, Maybank)
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.pink,
         onPressed: () => _showAddAccountDialog(context, user?.uid),
@@ -84,26 +130,41 @@ class AccountDashboard extends StatelessWidget {
     );
   }
 
+  // Modern Account Tile based on your screenshot
   Widget _buildAccountTile(String title, double balance) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      color: Colors.white.withOpacity(0.85),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(15),
+      ),
       child: ListTile(
-        leading: const CircleAvatar(
-          backgroundColor: Colors.pink,
-          child: Icon(Icons.account_balance_wallet, color: Colors.white),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        trailing: Text(
-          "RM ${balance.toStringAsFixed(2)}",
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text("Balance: RM ${balance.toStringAsFixed(2)}", style: const TextStyle(color: Colors.black54)),
+        trailing: const Icon(Icons.chevron_right, color: Colors.black45),
+        onTap: () {}, // Navigate to account details if needed
+      ),
+    );
+  }
+
+  // Navigation button helper for the bottom section
+  Widget _buildNavButton(BuildContext context, String text, IconData icon, Color color, String route) {
+    return SizedBox(
+      width: double.infinity,
+      height: 55,
+      child: OutlinedButton.icon(
+        onPressed: () => Navigator.pushNamed(context, route),
+        icon: Icon(icon, color: Colors.pink, size: 20),
+        label: Text(text, style: const TextStyle(color: Colors.pink, fontSize: 16)),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: color,
+          side: const BorderSide(color: Colors.black12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         ),
       ),
     );
   }
 
-  // Simple dialog to enter a new account name and initial balance
   void _showAddAccountDialog(BuildContext context, String? uid) {
     final nameCtrl = TextEditingController();
     final balanceCtrl = TextEditingController();
@@ -115,7 +176,7 @@ class AccountDashboard extends StatelessWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: "Account Name (e.g. BSN)")),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: "Account Name (e.g. BSN Sales)")),
             TextField(controller: balanceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: "Initial Balance")),
           ],
         ),
@@ -138,4 +199,5 @@ class AccountDashboard extends StatelessWidget {
       ),
     );
   }
+}
 }
