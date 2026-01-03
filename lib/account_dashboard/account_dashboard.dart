@@ -79,19 +79,31 @@ class AccountDashboard extends StatelessWidget {
                   ),
 
                   // --- ACCOUNTS LIST ---
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: docs.length,
-                      itemBuilder: (context, index) {
-                        final account = docs[index].data() as Map<String, dynamic>;
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    // Kita tambah +1 pada itemCount untuk memuatkan akaun dummy BSN
+                    itemCount: docs.length + 1, 
+                    itemBuilder: (context, index) {
+                      
+                      // 1. SEMAK JIKA INDEX PERTAMA (DUMMY DATA)
+                      if (index == 0) {
                         return _buildAccountTile(
-                          account['name'] ?? 'Account',
-                          (account['balance'] as num).toDouble(),
+                          'BSN ', 
+                          540.00, // Amaun duit dummy
                         );
-                      },
-                    ),
+                      }
+
+                      // 2. DATA DARI FIRESTORE (INDEX PERLU TOLAK 1)
+                      final accountData = docs[index - 1].data() as Map<String, dynamic>;
+                      
+                      return _buildAccountTile(
+                        accountData['name'] ?? 'Account',
+                        (accountData['balance'] as num?)?.toDouble() ?? 0.0,
+                      );
+                    },
                   ),
+                ),
 
                   // --- BOTTOM BUTTONS ---
                   Padding(
