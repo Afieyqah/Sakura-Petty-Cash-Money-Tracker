@@ -63,7 +63,7 @@ class AccountDashboard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Net Worth", style: TextStyle(fontSize: 18, color: Colors.black54)),
+                        const Text("Net Worth", style: TextStyle(fontSize: 18, color: Color.fromARGB(152, 0, 0, 0))),
                         const SizedBox(height: 8),
                         Text(
                           "RM ${totalNetWorth.toStringAsFixed(2)}",
