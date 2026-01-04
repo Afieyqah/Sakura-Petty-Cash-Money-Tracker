@@ -21,7 +21,6 @@ class _AddBudgetScreenState extends State<AddBudgetScreen> {
         'name': _nameController.text.trim(),
         'amount': double.tryParse(_amountController.text) ?? 0.0,
         'category': _category,
-        'spent': 0.0,
         'timestamp': FieldValue.serverTimestamp(),
       });
       Navigator.pop(context);
@@ -31,23 +30,39 @@ class _AddBudgetScreenState extends State<AddBudgetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("ADD BUDGET")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            TextField(controller: _nameController, decoration: const InputDecoration(labelText: "Budget Name")),
-            TextField(controller: _amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Limit RM")),
-            DropdownButton<String>(
-              value: _category,
-              items: ['Stationery', 'Food', 'Transport', 'Bills'].map((String value) {
-                return DropdownMenuItem<String>(value: value, child: Text(value));
-              }).toList(),
-              onChanged: (newValue) => setState(() => _category = newValue!),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(onPressed: _saveBudget, child: const Text("SAVE")),
-          ],
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: const Text("ADD BUDGET", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.pink.withOpacity(0.5),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(image: AssetImage('assets/images/cherry_blossom_bg.jpg'), fit: BoxFit.cover),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(top: 120, left: 20, right: 20),
+          child: Column(
+            children: [
+              TextField(controller: _nameController, decoration: const InputDecoration(labelText: "Budget Label", filled: true, fillColor: Colors.white70)),
+              const SizedBox(height: 10),
+              TextField(controller: _amountController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Limit RM", filled: true, fillColor: Colors.white70)),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: _category,
+                items: ['Stationery', 'Food', 'Transport', 'Bills', 'Fuel', 'Banner'].map((val) => DropdownMenuItem(value: val, child: Text(val))).toList(),
+                onChanged: (val) => setState(() => _category = val!),
+                decoration: const InputDecoration(filled: true, fillColor: Colors.white70),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _saveBudget, 
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.pink, minimumSize: const Size(double.infinity, 50)),
+                child: const Text("SAVE", style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -12,9 +12,10 @@ class BudgetListScreen extends StatelessWidget {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text("BUDGET LIST", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
+        title: const Text("Budget", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 26)),
+        backgroundColor: Colors.pink.withOpacity(0.5),
         elevation: 0,
+        centerTitle: true,
       ),
       body: Container(
         width: double.infinity,
@@ -25,40 +26,27 @@ class BudgetListScreen extends StatelessWidget {
           ),
         ),
         child: StreamBuilder<QuerySnapshot>(
-          // Stream 1: Get the user's budget categories
           stream: FirebaseFirestore.instance
               .collection('budgets')
               .where('userId', isEqualTo: user?.uid)
               .snapshots(),
           builder: (context, budgetSnap) {
-            if (budgetSnap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (!budgetSnap.hasData || budgetSnap.data!.docs.isEmpty) {
-              return const Center(child: Text("No budgets set. Click + to add one."));
-            }
+            if (!budgetSnap.hasData) return const Center(child: CircularProgressIndicator());
 
             return StreamBuilder<QuerySnapshot>(
-              // Stream 2: Get all expenses to calculate progress
               stream: FirebaseFirestore.instance
                   .collection('expenses')
                   .where('userId', isEqualTo: user?.uid)
                   .snapshots(),
               builder: (context, expSnap) {
-                if (!expSnap.hasData) return const SizedBox();
-
-                final allExpenses = expSnap.data!.docs;
-
-                return SafeArea(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: budgetSnap.data!.docs.length,
-                    itemBuilder: (context, index) {
-                      final bDoc = budgetSnap.data!.docs[index];
-                      return _buildBudgetCard(bDoc, allExpenses);
-                    },
-                  ),
+                final allExpenses = expSnap.data?.docs ?? [];
+                
+                return ListView.builder(
+                  padding: const EdgeInsets.only(top: 120, left: 20, right: 20),
+                  itemCount: budgetSnap.data!.docs.length,
+                  itemBuilder: (context, index) {
+                    return _buildStyledBudgetCard(budgetSnap.data!.docs[index], allExpenses);
+                  },
                 );
               },
             );
@@ -73,31 +61,26 @@ class BudgetListScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBudgetCard(DocumentSnapshot bDoc, List<DocumentSnapshot> expenses) {
+  Widget _buildStyledBudgetCard(DocumentSnapshot bDoc, List<DocumentSnapshot> expenses) {
     final String category = bDoc['category'] ?? 'General';
     final double budgetLimit = (bDoc['amount'] as num).toDouble();
-
-    // Calculate total spent for THIS specific category
     double totalSpent = 0;
+
     for (var exp in expenses) {
       if (exp['category'] == category) {
         totalSpent += (exp['amount'] as num).toDouble();
       }
     }
 
-    double progress = totalSpent / budgetLimit;
-    // Cap progress at 1.0 to prevent the bar from breaking
+    double progress = (budgetLimit > 0) ? (totalSpent / budgetLimit) : 0;
     if (progress > 1.0) progress = 1.0;
 
-    Color progressColor = progress > 0.9 ? Colors.red : Colors.pink;
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
+        color: Colors.pink.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(25),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,28 +88,41 @@ class BudgetListScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(category, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text(
-                "RM ${totalSpent.toStringAsFixed(2)} / RM ${budgetLimit.toStringAsFixed(2)}",
-                style: const TextStyle(fontSize: 14, color: Colors.black54),
+              Text(category.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text("RM ${budgetLimit.toInt()}", style: const TextStyle(color: Colors.white)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Stack(
+            children: [
+              Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.pink.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: progress,
+                child: Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.pink.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    "SPENT RM ${totalSpent.toInt()} OF RM ${budgetLimit.toInt()}",
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 10,
-              backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "${(progress * 100).toStringAsFixed(0)}% used",
-            style: TextStyle(color: progressColor, fontWeight: FontWeight.w600, fontSize: 12),
-          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 5, left: 10),
+            child: Text("${(progress * 100).toStringAsFixed(1)}%", style: const TextStyle(color: Colors.white, fontSize: 12)),
+          )
         ],
       ),
     );

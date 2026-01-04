@@ -12,6 +12,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
   bool _pinEnabled = false;
   bool _isLoading = true;
   final _user = FirebaseAuth.instance.currentUser;
+  final TextEditingController _pinController = TextEditingController();
 
   @override
   void initState() {
@@ -19,7 +20,6 @@ class _SecurityScreenState extends State<SecurityScreen> {
     _loadSecuritySettings();
   }
 
-  // Mengambil status PIN sedia ada dari Firestore
   Future<void> _loadSecuritySettings() async {
     if (_user != null) {
       final doc = await FirebaseFirestore.instance.collection('users').doc(_user!.uid).get();
@@ -32,21 +32,89 @@ class _SecurityScreenState extends State<SecurityScreen> {
     setState(() => _isLoading = false);
   }
 
-  Future<void> _togglePin(bool val) async {
-    setState(() => _pinEnabled = val);
+  // Fungsi untuk simpan PIN 6-digit ke Firestore
+  Future<void> _saveNewPin(String newPin) async {
     if (_user != null) {
       try {
         await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set({
-          'security': {'pin_enabled': val}
+          'security': {
+            'pin_enabled': true,
+            'app_pin': newPin, // Simpan PIN 6-digit
+          }
         }, SetOptions(merge: true));
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(val ? "PIN Security Enabled" : "PIN Security Disabled")),
+            const SnackBar(content: Text("6-Digit PIN successfully updated!")),
           );
         }
       } catch (e) {
-        debugPrint("Error updating security: $e");
+        debugPrint("Error saving PIN: $e");
+      }
+    }
+  }
+
+  // Dialog untuk tukar PIN
+  void _showChangePinDialog() {
+    _pinController.clear();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Set New 6-Digit PIN", style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Please enter 6 digits to secure your app."),
+            const SizedBox(height: 15),
+            TextField(
+              controller: _pinController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              obscureText: true,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 24, letterSpacing: 8),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                counterText: "",
+                hintText: "******",
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.pink),
+            onPressed: () {
+              if (_pinController.text.length == 6) {
+                _saveNewPin(_pinController.text);
+                Navigator.pop(context);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Please enter exactly 6 digits")),
+                );
+              }
+            },
+            child: const Text("Save PIN", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _togglePin(bool val) async {
+    if (val) {
+      // Jika user cuba aktifkan, paksa mereka set PIN dulu
+      _showChangePinDialog();
+    } else {
+      setState(() => _pinEnabled = false);
+      if (_user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set({
+          'security': {'pin_enabled': false}
+        }, SetOptions(merge: true));
       }
     }
   }
@@ -70,22 +138,29 @@ class _SecurityScreenState extends State<SecurityScreen> {
               ),
             ),
             child: ListView(
+              padding: const EdgeInsets.all(16),
               children: [
-                SwitchListTile(
-                  title: const Text("Unlock with PIN", style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text("Require a PIN to access the app"),
-                  activeColor: Colors.pink,
-                  value: _pinEnabled,
-                  onChanged: _togglePin,
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  child: SwitchListTile(
+                    title: const Text("Unlock with PIN", style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text("Require a 6-digit PIN to access the app"),
+                    activeColor: Colors.pink,
+                    value: _pinEnabled,
+                    onChanged: _togglePin,
+                  ),
                 ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.lock_outline, color: Colors.pink),
-                  title: const Text("Change PIN"),
-                  onTap: _pinEnabled ? () {
-                    // Tambah navigasi ke screen tukar PIN di sini nanti
-                  } : null,
-                  enabled: _pinEnabled,
+                const SizedBox(height: 10),
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  child: ListTile(
+                    leading: Icon(Icons.lock_outline, color: _pinEnabled ? Colors.pink : Colors.grey),
+                    title: const Text("Change PIN", style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text("Update your 6-digit security code"),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: _pinEnabled ? _showChangePinDialog : null,
+                    enabled: _pinEnabled,
+                  ),
                 ),
               ],
             ),
