@@ -15,10 +15,7 @@ class AccountDashboard extends StatelessWidget {
         title: const Text("Account Dashboard", style: TextStyle(color: Colors.black87)),
         elevation: 0,
         backgroundColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Colors.black87),
-          onPressed: () {}, 
-        ),
+        automaticallyImplyLeading: false, // Buang button menu line tiga
       ),
       body: Container(
         width: double.infinity,
@@ -73,59 +70,50 @@ class AccountDashboard extends StatelessWidget {
                     ),
                   ),
 
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    child: Text("Accounts", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  // --- SECTION HEADER (MENGGUNAKAN SPACER UNTUK ELAK ERROR) ---
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    child: Row(
+                      children: [
+                        const Text("Accounts", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Spacer(), // Menolak icon ke hujung kanan
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.pink),
+                          onPressed: () => _showAccountDialog(context, user?.uid),
+                        ),
+                      ],
+                    ),
                   ),
 
                   // --- ACCOUNTS LIST ---
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    // Kita tambah +1 pada itemCount untuk memuatkan akaun dummy BSN
-                    itemCount: docs.length + 1, 
-                    itemBuilder: (context, index) {
-                      
-                      // 1. SEMAK JIKA INDEX PERTAMA (DUMMY DATA)
-                      if (index == 0) {
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: docs.length,
+                      itemBuilder: (context, index) {
+                        final doc = docs[index];
+                        final accountData = doc.data() as Map<String, dynamic>;
+                        
                         return _buildAccountTile(
-                          'BSN ', 
-                          540.00, // Amaun duit dummy
+                          context,
+                          doc.id,
+                          accountData['name'] ?? 'Account',
+                          (accountData['balance'] as num?)?.toDouble() ?? 0.0,
+                          user?.uid,
                         );
-                      }
-
-                      // 2. DATA DARI FIRESTORE (INDEX PERLU TOLAK 1)
-                      final accountData = docs[index - 1].data() as Map<String, dynamic>;
-                      
-                      return _buildAccountTile(
-                        accountData['name'] ?? 'Account',
-                        (accountData['balance'] as num?)?.toDouble() ?? 0.0,
-                      );
-                    },
+                      },
+                    ),
                   ),
-                ),
 
-                  // --- BOTTOM BUTTONS ---
+                  // --- BOTTOM BUTTON ---
                   Padding(
                     padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        _buildNavButton(
-                          context, 
-                          "View Budget", 
-                          Icons.visibility, 
-                          const Color(0xFFFFE4E1), 
-                          '/view_budget'
-                        ),
-                        const SizedBox(height: 12),
-                        _buildNavButton(
-                          context, 
-                          "Budget List", 
-                          Icons.list_alt, 
-                          Colors.white.withOpacity(0.9),
-                          '/budget_list'
-                        ),
-                      ],
+                    child: _buildNavButton(
+                      context, 
+                      "View Budget", 
+                      Icons.visibility, 
+                      const Color(0xFFFFE4E1), 
+                      '/view_budget'
                     ),
                   ),
                 ],
@@ -134,15 +122,10 @@ class AccountDashboard extends StatelessWidget {
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.pink,
-        onPressed: () => _showAddAccountDialog(context, user?.uid),
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
     );
   }
 
-  Widget _buildAccountTile(String title, double balance) {
+  Widget _buildAccountTile(BuildContext context, String docId, String title, double balance, String? uid) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -153,7 +136,35 @@ class AccountDashboard extends StatelessWidget {
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text("Balance: RM ${balance.toStringAsFixed(2)}", style: const TextStyle(color: Colors.black54)),
         trailing: const Icon(Icons.chevron_right, color: Colors.black45),
-        onTap: () {},
+        onTap: () {
+          // Edit apabila tekan biasa
+          _showAccountDialog(context, uid, docId: docId, currentName: title, currentBalance: balance);
+        },
+        onLongPress: () {
+          // Padam apabila tekan lama
+          _showDeleteConfirmation(context, docId, title);
+        },
+      ),
+    );
+  }
+
+  // Dialog Pengesahan Padam
+  void _showDeleteConfirmation(BuildContext context, String docId, String name) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Account"),
+        content: Text("Are you sure you want to delete '$name'?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () async {
+              await FirebaseFirestore.instance.collection('accounts').doc(docId).delete();
+              if (context.mounted) Navigator.pop(context);
+            }, 
+            child: const Text("Delete", style: TextStyle(color: Colors.red))
+          ),
+        ],
       ),
     );
   }
@@ -175,19 +186,19 @@ class AccountDashboard extends StatelessWidget {
     );
   }
 
-  void _showAddAccountDialog(BuildContext context, String? uid) {
-    final nameCtrl = TextEditingController();
-    final balanceCtrl = TextEditingController();
+  void _showAccountDialog(BuildContext context, String? uid, {String? docId, String? currentName, double? currentBalance}) {
+    final nameCtrl = TextEditingController(text: currentName);
+    final balanceCtrl = TextEditingController(text: currentBalance?.toString());
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("New Account"),
+        title: Text(docId == null ? "New Account" : "Edit Account"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: "Account Name")),
-            TextField(controller: balanceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: "Initial Balance")),
+            TextField(controller: balanceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: "Balance")),
           ],
         ),
         actions: [
@@ -195,15 +206,20 @@ class AccountDashboard extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               if (uid != null && nameCtrl.text.isNotEmpty) {
-                await FirebaseFirestore.instance.collection('accounts').add({
+                final data = {
                   'userId': uid,
                   'name': nameCtrl.text.trim(),
                   'balance': double.tryParse(balanceCtrl.text) ?? 0.0,
-                });
+                };
+                if (docId == null) {
+                  await FirebaseFirestore.instance.collection('accounts').add(data);
+                } else {
+                  await FirebaseFirestore.instance.collection('accounts').doc(docId).update(data);
+                }
                 if (context.mounted) Navigator.pop(context);
               }
             },
-            child: const Text("Add"),
+            child: Text(docId == null ? "Add" : "Update"),
           ),
         ],
       ),
