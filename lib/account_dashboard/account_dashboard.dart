@@ -12,10 +12,10 @@ class AccountDashboard extends StatelessWidget {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text("Account Dashboard", style: TextStyle(color: Colors.black87)),
+        title: const Text("Account Dashboard", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
         elevation: 0,
         backgroundColor: Colors.transparent,
-        automaticallyImplyLeading: false, // Buang button menu line tiga
+        automaticallyImplyLeading: false,
       ),
       body: Container(
         width: double.infinity,
@@ -35,8 +35,8 @@ class AccountDashboard extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
 
-            double totalNetWorth = 0;
             final docs = snapshot.data?.docs ?? [];
+            double totalNetWorth = 0;
             for (var doc in docs) {
               totalNetWorth += (doc['balance'] as num).toDouble();
             }
@@ -54,31 +54,34 @@ class AccountDashboard extends StatelessWidget {
                       color: Colors.white.withOpacity(0.9),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
-                      ],
+  BoxShadow(
+    color: Colors.black.withOpacity(0.1), // Ini sama nilai dengan black10
+    blurRadius: 10,
+    offset: const Offset(0, 4), // Opsional: Untuk nampak lebih natural
+  ),
+],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Net Worth", style: TextStyle(fontSize: 18, color: Color.fromARGB(152, 0, 0, 0))),
+                        const Text("Real-time Net Worth", style: TextStyle(fontSize: 16, color: Colors.black54)),
                         const SizedBox(height: 8),
                         Text(
                           "RM ${totalNetWorth.toStringAsFixed(2)}",
-                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black87),
+                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.pinkAccent),
                         ),
                       ],
                     ),
                   ),
 
-                  // --- SECTION HEADER (MENGGUNAKAN SPACER UNTUK ELAK ERROR) ---
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                     child: Row(
                       children: [
-                        const Text("Accounts", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        const Spacer(), // Menolak icon ke hujung kanan
+                        const Text("My Accounts", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Spacer(),
                         IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.pink),
+                          icon: const Icon(Icons.add_circle, color: Colors.pink, size: 30),
                           onPressed: () => _showAccountDialog(context, user?.uid),
                         ),
                       ],
@@ -92,29 +95,22 @@ class AccountDashboard extends StatelessWidget {
                       itemCount: docs.length,
                       itemBuilder: (context, index) {
                         final doc = docs[index];
-                        final accountData = doc.data() as Map<String, dynamic>;
-                        
+                        final data = doc.data() as Map<String, dynamic>;
                         return _buildAccountTile(
-                          context,
-                          doc.id,
-                          accountData['name'] ?? 'Account',
-                          (accountData['balance'] as num?)?.toDouble() ?? 0.0,
-                          user?.uid,
+                          context, 
+                          doc.id, 
+                          data['name'] ?? 'Account', 
+                          (data['balance'] as num).toDouble(), 
+                          data['type'] ?? 'Cash', 
+                          user?.uid
                         );
                       },
                     ),
                   ),
 
-                  // --- BOTTOM BUTTON ---
                   Padding(
                     padding: const EdgeInsets.all(20),
-                    child: _buildNavButton(
-                      context, 
-                      "View Budget", 
-                      Icons.visibility, 
-                      const Color(0xFFFFE4E1), 
-                      '/view_budget'
-                    ),
+                    child: _buildNavButton(context, "View Budget", Icons.account_balance_wallet, const Color(0xFFFFE4E1), '/view_budget'),
                   ),
                 ],
               ),
@@ -125,30 +121,78 @@ class AccountDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildAccountTile(BuildContext context, String docId, String title, double balance, String? uid) {
+  Widget _buildAccountTile(BuildContext context, String docId, String title, double balance, String type, String? uid) {
+    IconData typeIcon;
+    switch (type) {
+      case 'Online Banking': typeIcon = Icons.account_balance; break;
+      case 'E-wallet': typeIcon = Icons.account_balance_wallet; break;
+      case 'Credit Card': typeIcon = Icons.credit_card; break;
+      default: typeIcon = Icons.payments;
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(15),
-      ),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), borderRadius: BorderRadius.circular(15)),
       child: ListTile(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text("Balance: RM ${balance.toStringAsFixed(2)}", style: const TextStyle(color: Colors.black54)),
-        trailing: const Icon(Icons.chevron_right, color: Colors.black45),
-        onTap: () {
-          // Edit apabila tekan biasa
-          _showAccountDialog(context, uid, docId: docId, currentName: title, currentBalance: balance);
-        },
-        onLongPress: () {
-          // Padam apabila tekan lama
-          _showDeleteConfirmation(context, docId, title);
-        },
+        leading: CircleAvatar(backgroundColor: Colors.pink.withOpacity(0.1), child: Icon(typeIcon, color: Colors.pink)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(type, style: const TextStyle(fontSize: 12)),
+        trailing: Text("RM ${balance.toStringAsFixed(2)}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+        onTap: () => _showAccountDialog(context, uid, docId: docId, currentName: title, currentBalance: balance, currentType: type),
+        onLongPress: () => _showDeleteConfirmation(context, docId, title),
       ),
     );
   }
 
-  // Dialog Pengesahan Padam
+  void _showAccountDialog(BuildContext context, String? uid, {String? docId, String? currentName, double? currentBalance, String? currentType}) {
+    final nameCtrl = TextEditingController(text: currentName);
+    final balanceCtrl = TextEditingController(text: currentBalance?.toString());
+    String selectedType = currentType ?? 'Cash';
+    final List<String> types = ['Online Banking', 'Cash', 'E-wallet', 'Credit Card'];
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(docId == null ? "New Account" : "Edit Account"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "Account Name")),
+              TextField(controller: balanceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Balance")),
+              DropdownButtonFormField<String>(
+                value: selectedType,
+                items: types.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                onChanged: (val) => setDialogState(() => selectedType = val!),
+                decoration: const InputDecoration(labelText: "Type"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              onPressed: () async {
+                if (uid != null && nameCtrl.text.isNotEmpty) {
+                  final data = {
+                    'userId': uid,
+                    'name': nameCtrl.text.trim(),
+                    'balance': double.tryParse(balanceCtrl.text) ?? 0.0,
+                    'type': selectedType,
+                  };
+                  docId == null 
+                    ? await FirebaseFirestore.instance.collection('accounts').add(data)
+                    : await FirebaseFirestore.instance.collection('accounts').doc(docId).update(data);
+                  if (context.mounted) Navigator.pop(context);
+                }
+              },
+              child: const Text("Save"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showDeleteConfirmation(BuildContext context, String docId, String name) {
     showDialog(
       context: context,
@@ -157,13 +201,10 @@ class AccountDashboard extends StatelessWidget {
         content: Text("Are you sure you want to delete '$name'?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          TextButton(
-            onPressed: () async {
-              await FirebaseFirestore.instance.collection('accounts').doc(docId).delete();
-              if (context.mounted) Navigator.pop(context);
-            }, 
-            child: const Text("Delete", style: TextStyle(color: Colors.red))
-          ),
+          TextButton(onPressed: () async {
+            await FirebaseFirestore.instance.collection('accounts').doc(docId).delete();
+            if (context.mounted) Navigator.pop(context);
+          }, child: const Text("Delete", style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -171,57 +212,12 @@ class AccountDashboard extends StatelessWidget {
 
   Widget _buildNavButton(BuildContext context, String text, IconData icon, Color color, String route) {
     return SizedBox(
-      width: double.infinity,
-      height: 55,
+      width: double.infinity, height: 55,
       child: OutlinedButton.icon(
         onPressed: () => Navigator.pushNamed(context, route),
-        icon: Icon(icon, color: Colors.pink, size: 20),
-        label: Text(text, style: const TextStyle(color: Colors.pink, fontSize: 16)),
-        style: OutlinedButton.styleFrom(
-          backgroundColor: color,
-          side: const BorderSide(color: Colors.black12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        ),
-      ),
-    );
-  }
-
-  void _showAccountDialog(BuildContext context, String? uid, {String? docId, String? currentName, double? currentBalance}) {
-    final nameCtrl = TextEditingController(text: currentName);
-    final balanceCtrl = TextEditingController(text: currentBalance?.toString());
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(docId == null ? "New Account" : "Edit Account"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: "Account Name")),
-            TextField(controller: balanceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: "Balance")),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () async {
-              if (uid != null && nameCtrl.text.isNotEmpty) {
-                final data = {
-                  'userId': uid,
-                  'name': nameCtrl.text.trim(),
-                  'balance': double.tryParse(balanceCtrl.text) ?? 0.0,
-                };
-                if (docId == null) {
-                  await FirebaseFirestore.instance.collection('accounts').add(data);
-                } else {
-                  await FirebaseFirestore.instance.collection('accounts').doc(docId).update(data);
-                }
-                if (context.mounted) Navigator.pop(context);
-              }
-            },
-            child: Text(docId == null ? "Add" : "Update"),
-          ),
-        ],
+        icon: Icon(icon, color: Colors.pink),
+        label: Text(text, style: const TextStyle(color: Colors.pink)),
+        style: OutlinedButton.styleFrom(backgroundColor: color, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
       ),
     );
   }

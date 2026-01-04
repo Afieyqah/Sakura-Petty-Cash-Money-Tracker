@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../alerts/alerts_screen.dart'; 
-// import 'bills/bills_screen.dart'; // Aktifkan bila fail ini sudah ada
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -10,7 +9,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // Data State untuk simpan pilihan user buat sementara
+  // Data State tempatan
   String selectedCurrency = "Malaysia Ringgit (RM)";
   String selectedLanguage = "English";
   String firstDayOfWeek = "Sunday";
@@ -51,8 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // --- SECTION: FEATURES ---
             _buildNavigationItem("Bills", "Manage your monthly bills", () {
-               // Navigator.push(context, MaterialPageRoute(builder: (_) => const BillsScreen()));
-               print("Navigating to Bills...");
+                // Tambah navigation di sini jika perlu
             }),
 
             _buildNavigationItem("Alerts", "Budget & limit reminders", () {
@@ -78,10 +76,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(title, style: TextStyle(color: textBlue, fontWeight: FontWeight.bold)),
-          subtitle: subtitle != null ? Text(subtitle, style: TextStyle(color: textBlue.withOpacity(0.7))) : null,
+          // DIUBAH: withOpacity -> withValues (Fix for Flutter 3.33+)
+          subtitle: subtitle != null ? Text(subtitle, style: TextStyle(color: textBlue.withValues(alpha: 0.7))) : null,
           onTap: onTap,
         ),
-        Divider(color: Colors.purple.withOpacity(0.3)),
+        // DIUBAH: withOpacity -> withValues
+        Divider(color: Colors.purple.withValues(alpha: 0.3)),
       ],
     );
   }
@@ -93,11 +93,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(title, style: TextStyle(color: textBlue, fontWeight: FontWeight.bold)),
-          subtitle: Text(subtitle, style: TextStyle(color: textBlue.withOpacity(0.7))),
+          // DIUBAH: withOpacity -> withValues
+          subtitle: Text(subtitle, style: TextStyle(color: textBlue.withValues(alpha: 0.7))),
           trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
           onTap: onTap,
         ),
-        Divider(color: Colors.purple.withOpacity(0.3)),
+        Divider(color: Colors.purple.withValues(alpha: 0.3)),
       ],
     );
   }
@@ -109,8 +110,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: Text("Notifications", style: TextStyle(color: textBlue, fontWeight: FontWeight.bold)),
+          // DIUBAH: withOpacity -> withValues
           subtitle: Text(isNotificationOn ? "Receive all notifications" : "Notifications muted", 
-            style: TextStyle(color: textBlue.withOpacity(0.7))),
+            style: TextStyle(color: textBlue.withValues(alpha: 0.7))),
           value: isNotificationOn,
           activeColor: Colors.pink,
           onChanged: (bool value) {
@@ -119,7 +121,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             });
           },
         ),
-        Divider(color: Colors.purple.withOpacity(0.3)),
+        Divider(color: Colors.purple.withValues(alpha: 0.3)),
       ],
     );
   }
