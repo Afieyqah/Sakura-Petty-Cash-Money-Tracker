@@ -3,7 +3,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 class AiService {
   final GenerativeModel model = GenerativeModel(
     model: 'gemini-1.5-flash',
-    apiKey: 'AIzaSyBUh2vs3q0zHnbybOeXvnEi8ZTV1iuvkkc', 
+    apiKey: 'AIzaSyBSjReQldADTToIhUaseroah1-HXXRiSC8', 
   );
 
   Future<String> generateMonthlyReport(List<Map<String, dynamic>> expenses) async {

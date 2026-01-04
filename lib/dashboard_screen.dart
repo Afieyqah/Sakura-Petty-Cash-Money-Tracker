@@ -3,11 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+// Your existing imports
 import 'login_and_authenthication/auth_service.dart';
 import 'analystic_dashboard/analystic_screen.dart';
 import 'settings/profile_screen.dart';
 import 'budgets/budget_list_screen.dart';
-import '../screens/expense_main_screen.dart'; // Pastikan import ini betul
+import '../screens/expense_main_screen.dart'; 
+
+// Import your Chat Screen file
+import 'chat_screen.dart'; 
 
 class DashboardScreen extends StatefulWidget {
   final String role;
@@ -35,6 +39,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (raw is double) return raw;
     if (raw is String) return double.tryParse(raw) ?? 0.0;
     return 0.0;
+  }
+
+  // --- AI TILE LOGIC ---
+  Widget _buildAiTile() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('expenses').snapshots(),
+      builder: (context, snapshot) {
+        List<Map<String, dynamic>> currentExpenses = [];
+        if (snapshot.hasData) {
+          currentExpenses = snapshot.data!.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return {
+              'category': data['category'] ?? 'Misc',
+              'amount': _parseAmount(data['amount']),
+              'remark': data['remark'] ?? '',
+            };
+          }).toList();
+        }
+
+        return _card(
+          InkWell(
+            onTap: () {
+              // Now navigating to ChatScreen and passing current data
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatScreen(expenses: currentExpenses),
+                ),
+              );
+            },
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.auto_awesome, color: Colors.purple, size: 30),
+                ),
+                const SizedBox(width: 15),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Ask AI Assistant", 
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text("Analyze your spending patterns with AI", 
+                        style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _addExpense() {
@@ -80,10 +143,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Correctly define the pages list for navigation
     final List<Widget> pages = [
       _buildHomeContent(),
       const AnalyticsScreen(),
-      const SizedBox(), 
+      const SizedBox(), // Placeholder for floating button space
       const BudgetListScreen(),
       const ProfileScreen(),
     ];
@@ -99,6 +163,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [IconButton(onPressed: () => _auth.logout(), icon: const Icon(Icons.logout, color: Colors.white))],
       ),
       body: Container(
+        height: double.infinity,
+        width: double.infinity,
         decoration: const BoxDecoration(
           image: DecorationImage(image: AssetImage('assets/images/cherry_blossom_bg.jpg'), fit: BoxFit.cover),
         ),
@@ -126,7 +192,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               _navIcon(Icons.home_rounded, "Home", 0),
               _navIcon(Icons.bar_chart_rounded, "Stats", 1),
-              const SizedBox(width: 40),
+              const SizedBox(width: 40), // Empty space for FAB
               _navIcon(Icons.account_balance_wallet_rounded, "Budgets", 3),
               _navIcon(Icons.person_rounded, "Profile", 4),
             ],
@@ -141,10 +207,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         children: [
           const SizedBox(height: 15),
-          _buildBalanceCard(), // Mengambil data dari Koleksi Accounts
+          _buildBalanceCard(), 
           _buildPieChart(),
           _buildTips(),
-          _buildExpenseList(), // Dengan View All Link
+          _buildAiTile(), 
+          _buildExpenseList(), 
           const SizedBox(height: 100),
         ],
       ),
@@ -154,7 +221,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildBalanceCard() {
     final user = FirebaseAuth.instance.currentUser;
     return StreamBuilder<QuerySnapshot>(
-      // Listen to Accounts for Net Worth
       stream: FirebaseFirestore.instance.collection('accounts').where('userId', isEqualTo: user?.uid).snapshots(),
       builder: (context, accountSnap) {
         double totalNetWorth = 0;
@@ -163,9 +229,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             totalNetWorth += _parseAmount(doc['balance']);
           }
         }
-
         return StreamBuilder<QuerySnapshot>(
-          // Listen to Expenses
           stream: FirebaseFirestore.instance.collection('expenses').snapshots(),
           builder: (context, expenseSnap) {
             double totalSpent = 0;
@@ -175,30 +239,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }
             }
             final remaining = totalNetWorth - totalSpent;
-
             return _card(
               Column(
                 children: [
-                  const Text("Available Balance (Net Worth - Expenses)", 
-                      style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 12)),
+                  const Text("Available Balance", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 12)),
                   const SizedBox(height: 10),
-                  Text(
-                    "RM ${remaining.toStringAsFixed(2)}",
-                    style: TextStyle(
-                      fontSize: 32, 
-                      fontWeight: FontWeight.w900, 
-                      color: remaining < 0 ? Colors.red : Colors.black87
-                    ),
+                  Text("RM ${remaining.toStringAsFixed(2)}",
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: remaining < 0 ? Colors.red : Colors.black87),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text("Net Worth: RM ${totalNetWorth.toStringAsFixed(2)}", 
-                          style: const TextStyle(color: Colors.blueGrey, fontSize: 12)),
+                      Text("Net Worth: RM ${totalNetWorth.toStringAsFixed(2)}", style: const TextStyle(color: Colors.blueGrey, fontSize: 12)),
                       const SizedBox(width: 15),
-                      Text("Spent: RM ${totalSpent.toStringAsFixed(2)}", 
-                          style: const TextStyle(color: Colors.pink, fontWeight: FontWeight.bold, fontSize: 12)),
+                      Text("Spent: RM ${totalSpent.toStringAsFixed(2)}", style: const TextStyle(color: Colors.pink, fontWeight: FontWeight.bold, fontSize: 12)),
                     ],
                   ),
                 ],
@@ -220,11 +275,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final data = d.data() as Map<String, dynamic>;
           totals[data['category'] ?? 'Other'] = (totals[data['category']] ?? 0) + _parseAmount(data['amount']);
         }
-
-        final List<Color> pinkShades = [
-          const Color(0xFFF06292), const Color(0xFFE91E63), const Color(0xFFC2185B), const Color(0xFFF48FB1), const Color(0xFF880E4F),
-        ];
-
+        final List<Color> pinkShades = [const Color(0xFFF06292), const Color(0xFFE91E63), const Color(0xFFC2185B), const Color(0xFFF48FB1), const Color(0xFF880E4F)];
         return _card(
           SizedBox(
             height: 200,
@@ -267,29 +318,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context, snap) {
         if (!snap.hasData) return const SizedBox();
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 25, right: 25, top: 15, bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text("Recent Activity", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const ExpenseMainScreen()),
-                      );
-                    },
-                    child: const Text(
-                      "View All",
-                      style: TextStyle(
-                        color: Colors.pink,
-                        decoration: TextDecoration.underline,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ExpenseMainScreen())),
+                    child: const Text("View All", style: TextStyle(color: Colors.pink, decoration: TextDecoration.underline, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -302,17 +340,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final data = snap.data!.docs[i].data() as Map<String, dynamic>;
                 return Container(
                   margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.85), 
-                    borderRadius: BorderRadius.circular(18), 
-                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)]
-                  ),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.85), borderRadius: BorderRadius.circular(18), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)]),
                   child: ListTile(
                     leading: const CircleAvatar(backgroundColor: Colors.pinkAccent, child: Icon(Icons.receipt_long_rounded, color: Colors.white)),
                     title: Text(data['remark'] ?? 'Expense', style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text(data['category'] ?? 'General'),
-                    trailing: Text("- RM ${_parseAmount(data['amount']).toStringAsFixed(2)}", 
-                        style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)),
+                    trailing: Text("- RM ${_parseAmount(data['amount']).toStringAsFixed(2)}", style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)),
                   ),
                 );
               },
@@ -331,8 +364,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: active ? Colors.white : Colors.white70, size: 28),
-          Text(label, style: TextStyle(color: active ? Colors.white : Colors.white70, 
-              fontSize: 10, fontWeight: active ? FontWeight.bold : FontWeight.normal)),
+          Text(label, style: TextStyle(color: active ? Colors.white : Colors.white70, fontSize: 10, fontWeight: active ? FontWeight.bold : FontWeight.normal)),
         ],
       ),
     );
