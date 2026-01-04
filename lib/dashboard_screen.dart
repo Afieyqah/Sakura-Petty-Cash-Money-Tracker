@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 
 import 'login_and_authenthication/auth_service.dart';
 import 'login_and_authenthication/welcome_screen.dart';
+
 import 'analystic_dashboard/analystic_screen.dart';
 import 'settings/profile_screen.dart';
 import 'budgets/budget_list_screen.dart';
@@ -28,6 +29,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ];
   int tipIndex = 0;
 
+  // ---------------- Helpers ----------------
   double _parseAmount(dynamic raw) {
     if (raw is int) return raw.toDouble();
     if (raw is double) return raw;
@@ -37,10 +39,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
-  }
-
-  void _nextTip() {
-    setState(() => tipIndex = (tipIndex + 1) % tips.length);
   }
 
   Future<void> _logout() async {
@@ -53,101 +51,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- FUNGSI UPDATE BUDGET ---
-  void _showUpdateBudgetDialog(double currentBudget) {
-    if (widget.role == "staff") {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Only Owners/Managers can update budget")),
-      );
-      return;
-    }
-    final budgetCtrl = TextEditingController(text: currentBudget.toString());
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Set Monthly Budget"),
-             content: TextField(
-          controller: budgetCtrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: "Budget Amount (RM)"),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () async {
-              await FirebaseFirestore.instance
-                  .collection('settings')
-                  .doc('budget')
-                  .set({'amount': double.tryParse(budgetCtrl.text) ?? 0.0});
-              if (mounted) Navigator.pop(context);
-            },
-            child: const Text("Save"),
-          ),
-        ],
-      ),
-    );
-  }
+  // ---------------- Pages ----------------
+  late final List<Widget> _pages = [
+    _buildHomeContent(), // 0 Home
+    const AnalyticsScreen(), // 1 Stats (RESTORED)
+    const SizedBox(), // 2 FAB placeholder
+    const BudgetListScreen(), // 3 Records
+    const ProfileScreen(), // 4 Profile
+  ];
 
-  // --- FUNGSI ADD EXPENSE ---
-  void _addExpense() {
-    if (widget.role != "staff" && widget.role != "manager" && widget.role != "owner") return;
-    
-    final remarkCtrl = TextEditingController();
-    final amountCtrl = TextEditingController();
-    final categoryCtrl = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Add Expense"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: remarkCtrl, decoration: const InputDecoration(labelText: "Remark")),
-            TextField(controller: amountCtrl, decoration: const InputDecoration(labelText: "Amount"), keyboardType: TextInputType.number),
-            TextField(controller: categoryCtrl, decoration: const InputDecoration(labelText: "Category")),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            onPressed: () {
-              if (remarkCtrl.text.isNotEmpty && amountCtrl.text.isNotEmpty) {
-                FirebaseFirestore.instance.collection('expenses').add({
-                  'remark': remarkCtrl.text,
-                  'amount': double.tryParse(amountCtrl.text) ?? 0.0,
-                  'category': categoryCtrl.text,
-                  'date': FieldValue.serverTimestamp(),
-                  'approved': widget.role == "owner" || widget.role == "manager",
-                });
-                Navigator.pop(context);
-              }
-            },
-            child: const Text("Add"),
-          ),
-        ],
-      ),
-    );
-  }
-
+  // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Dashboard • ${widget.role}'),
         backgroundColor: Colors.white,
-        actions: [IconButton(onPressed: _logout, icon: const Icon(Icons.logout, color: Colors.pink))],
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.pink),
+            onPressed: _logout,
+          ),
+        ],
       ),
       body: Container(
         decoration: const BoxDecoration(
-          image: DecorationImage(image: AssetImage('assets/images/cherry_blossom_bg.jpg'), fit: BoxFit.cover),
+          image: DecorationImage(
+            image: AssetImage('assets/images/cherry_blossom_bg.jpg'),
+            fit: BoxFit.cover,
+          ),
         ),
-        child: _buildBodyContent(),
+        child: _pages[_selectedIndex],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.pink,
         onPressed: _addExpense,
-        child: const Icon(Icons.add, size: 30, color: Colors.white),
+        child: const Icon(Icons.add, size: 30),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
@@ -167,11 +107,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildBodyContent() {
-    if (_selectedIndex == 1) return const AnalyticsScreen();
-    if (_selectedIndex == 3) return const BudgetListScreen();
-    if (_selectedIndex == 4) return const ProfileScreen();
+  Widget _navIcon(IconData icon, String label, int index) {
+    final active = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () => _onItemTapped(index),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: active ? Colors.pink : Colors.grey, size: 28),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: active ? Colors.pink : Colors.grey,
+              fontWeight: active ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  // ---------------- Home Content ----------------
+  Widget _buildHomeContent() {
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -190,12 +148,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildBalanceCard() {
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('settings').doc('budget').snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('settings')
+          .doc('budget')
+          .snapshots(),
       builder: (context, budgetSnap) {
-        double budget = 0.0;
+        double budget = 0;
         if (budgetSnap.hasData && budgetSnap.data!.exists) {
           budget = _parseAmount(budgetSnap.data!['amount']);
         }
+
         return StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance.collection('expenses').snapshots(),
           builder: (context, snap) {
@@ -206,17 +168,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }
             }
             final remaining = budget - spent;
-            return GestureDetector(
-              onTap: () => _showUpdateBudgetDialog(budget),
-              child: _card(
-                Column(
-                  children: [
-                    Text(widget.role == "owner" ? "Owner Financial Overview" : "Available Balance"),
-                    const SizedBox(height: 8),
-                    Text("RM ${remaining.toStringAsFixed(2)}", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                    Text("Total Spent: RM ${spent.toStringAsFixed(2)}", style: const TextStyle(color: Colors.pink)),
-                  ],
-                ),
+
+            return _card(
+              Column(
+                children: [
+                  Text(
+                    widget.role == "owner"
+                        ? "Owner Financial Overview"
+                        : "Available Balance",
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "RM ${remaining.toStringAsFixed(2)}",
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    "Total Spent: RM ${spent.toStringAsFixed(2)}",
+                    style: const TextStyle(color: Colors.pink),
+                  ),
+                ],
               ),
             );
           },
@@ -229,16 +203,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('expenses').snapshots(),
       builder: (context, snap) {
-        if (!snap.hasData || snap.data!.docs.isEmpty) return _card(const Text("No expense data"));
+        if (!snap.hasData || snap.data!.docs.isEmpty) {
+          return _card(const Text("No expense data"));
+        }
+
         final Map<String, double> totals = {};
         for (var d in snap.data!.docs) {
           final data = d.data() as Map<String, dynamic>;
-          totals[data['category'] ?? 'Other'] = (totals[data['category']] ?? 0) + _parseAmount(data['amount']);
+          totals[data['category'] ?? 'Other'] =
+              (totals[data['category']] ?? 0) + _parseAmount(data['amount']);
         }
+
         return _card(
           SizedBox(
             height: 180,
-            child: PieChart(PieChartData(sections: totals.entries.map((e) => PieChartSectionData(value: e.value, title: e.key, color: Colors.pinkAccent, radius: 50)).toList())),
+            child: PieChart(
+              PieChartData(
+                centerSpaceRadius: 30,
+                sections: totals.entries.map((e) {
+                  return PieChartSectionData(
+                    value: e.value,
+                    title: e.key,
+                    radius: 55,
+                    color: Colors.pinkAccent,
+                    titleStyle: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
           ),
         );
       },
@@ -248,8 +243,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildTips() {
     return _card(
       GestureDetector(
-        onTap: _nextTip,
-        child: Row(children: [const Icon(Icons.lightbulb, color: Colors.pink), const SizedBox(width: 8), Expanded(child: Text(tips[tipIndex]))]),
+        onTap: () => setState(() => tipIndex = (tipIndex + 1) % tips.length),
+        child: Row(
+          children: [
+            const Icon(Icons.lightbulb, color: Colors.pink),
+            const SizedBox(width: 8),
+            Expanded(child: Text(tips[tipIndex])),
+          ],
+        ),
       ),
     );
   }
@@ -258,20 +259,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('expenses').snapshots(),
       builder: (context, snap) {
-        if (!snap.hasData) return const CircularProgressIndicator();
-        final docs = snap.data!.docs;
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.data!.docs.isEmpty) {
+          return const Center(child: Text("No expenses yet"));
+        }
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: docs.length,
+          itemCount: snap.data!.docs.length,
           itemBuilder: (_, i) {
-            final data = docs[i].data() as Map<String, dynamic>;
+            final data = snap.data!.docs[i].data() as Map<String, dynamic>;
             return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: ListTile(
                 leading: const Icon(Icons.payments, color: Colors.pink),
                 title: Text(data['remark'] ?? 'No remark'),
-                trailing: Text("RM ${_parseAmount(data['amount']).toStringAsFixed(2)}"),
+                trailing: Text(
+                  "RM ${_parseAmount(data['amount']).toStringAsFixed(2)}",
+                ),
               ),
             );
           },
@@ -280,27 +286,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _navIcon(IconData icon, String label, int index) {
-    final active = _selectedIndex == index;
-    return GestureDetector(
-      onTap: () => _onItemTapped(index),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: active ? Colors.pink : Colors.grey, size: 28),
-          Text(label, style: TextStyle(fontSize: 12, color: active ? Colors.pink : Colors.grey)),
-        ],
+  Widget _card(Widget child) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(16),
       ),
+      child: child,
     );
   }
 
-  Widget _card(Widget child) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), borderRadius: BorderRadius.circular(16)),
-      child: child,
-    );
+  void _addExpense() {
+    // hook your add-expense dialog here
   }
 }
