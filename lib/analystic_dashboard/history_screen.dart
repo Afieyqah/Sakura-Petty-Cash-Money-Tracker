@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// Pastikan path ini betul mengikut struktur projek anda
+// Ensure this path matches your project structure
 import 'package:selab_project/analystic_dashboard/analystic_screen.dart'; 
 
 class HistoryScreen extends StatefulWidget {
@@ -31,7 +31,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     "Lowest Amount",
   ];
 
-  // Map warna kategori (Pastikan ini selaras dengan skrin Analytics anda)
   final Map<String, Color> categoryColorMap = {
     "Food": Colors.orange,
     "Fuel": Colors.blue,
@@ -69,7 +68,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           date.year == selectedMonth.year;
     }).toList();
 
-    // Sorting
+    // Sorting logic
     data.sort((a, b) {
       final dateA = a['date'] as DateTime;
       final dateB = b['date'] as DateTime;
@@ -119,13 +118,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  // Convert Firestore docs to List<Map<String, dynamic>>
                   List<Map<String, dynamic>> allExpenses = snapshot.data!.docs.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
                     return {
                       'category': data['category'] ?? 'Misc',
                       'amount': double.tryParse(data['amount']?.toString() ?? '0') ?? 0.0,
-                      // PEMBETULAN: Menghantar data mentah (dynamic) ke parser
                       'date': _parseFirestoreDate(data['date']),
                     };
                   }).toList();
@@ -163,7 +160,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           leading: CircleAvatar(
                             backgroundColor: categoryColorMap[e['category']]?.withOpacity(0.2) ?? Colors.grey.shade300,
                             child: Text(
-                              (e['category'] as String)[0],
+                              (e['category'] as String).isNotEmpty ? (e['category'] as String)[0] : "?",
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: categoryColorMap[e['category']] ?? Colors.black,
@@ -198,7 +195,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // ---------------- FILTER PANEL ----------------
+  // --- UPDATED FILTER PANEL TO PREVENT OVERFLOW ---
   Widget _filterPanel() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -208,34 +205,43 @@ class _HistoryScreenState extends State<HistoryScreen> {
         boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true, // Key fix: Ensures child stays within bounds
                   value: selectedCategory,
                   decoration: const InputDecoration(
                     labelText: "Category",
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   ),
                   items: categories
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                      .map((c) => DropdownMenuItem(
+                            value: c, 
+                            child: Text(c, overflow: TextOverflow.ellipsis),
+                          ))
                       .toList(),
                   onChanged: (v) => setState(() => selectedCategory = v!),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10), // Reduced gap for more space
               Expanded(
                 child: DropdownButtonFormField<String>(
+                  isExpanded: true, // Key fix
                   value: selectedSort,
                   decoration: const InputDecoration(
                     labelText: "Sort By",
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   ),
                   items: sortOptions
-                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .map((s) => DropdownMenuItem(
+                            value: s, 
+                            child: Text(s, overflow: TextOverflow.ellipsis),
+                          ))
                       .toList(),
                   onChanged: (v) => setState(() => selectedSort = v!),
                 ),
@@ -246,7 +252,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              icon: const Icon(Icons.calendar_month),
+              icon: const Icon(Icons.calendar_month, size: 20),
               label: Text("Month: ${selectedMonth.month}/${selectedMonth.year}"),
               onPressed: _pickMonth,
               style: OutlinedButton.styleFrom(
@@ -259,14 +265,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // ---------------- PEMBETULAN: Firestore Date Parser ----------------
   DateTime _parseFirestoreDate(dynamic raw) {
-    // 1. Jika data adalah Timestamp (format standard Firestore)
     if (raw is Timestamp) {
       return raw.toDate();
     }
     
-    // 2. Jika data adalah String (format dd/MM/yyyy)
     if (raw is String) {
       try {
         final parts = raw.split('/');
@@ -281,8 +284,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
         debugPrint("Error parsing date string: $e");
       }
     }
-    
-    // Default jika data null atau tidak sah
     return DateTime.now();
   }
 }
