@@ -299,6 +299,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _addExpense() {
+    void _addExpense() {
+  // 1. Sediakan controller untuk ambil teks dari input
+  final remarkCtrl = TextEditingController();
+  final amountCtrl = TextEditingController();
+  final categoryCtrl = TextEditingController();
+
+  // 2. Tunjukkan pop-up (Dialog)
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text("Add New Expense"),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(controller: remarkCtrl, decoration: const InputDecoration(labelText: "Remark (e.g. Nasi Lemak)")),
+          TextField(controller: amountCtrl, decoration: const InputDecoration(labelText: "Amount (RM)"), keyboardType: TextInputType.number),
+          TextField(controller: categoryCtrl, decoration: const InputDecoration(labelText: "Category (e.g. Food)")),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+        ElevatedButton(
+          onPressed: () async {
+            if (remarkCtrl.text.isNotEmpty && amountCtrl.text.isNotEmpty) {
+              // 3. Simpan ke Firebase
+              await FirebaseFirestore.instance.collection('expenses').add({
+                'remark': remarkCtrl.text,
+                'amount': double.tryParse(amountCtrl.text) ?? 0.0,
+                'category': categoryCtrl.text,
+                'date': FieldValue.serverTimestamp(), // Simpan masa sekarang
+                'approved': false, // Untuk kegunaan Manager/Owner nanti
+              });
+              
+              if (mounted) Navigator.pop(context); // Tutup dialog selepas simpan
+            }
+          },
+          child: const Text("Add Now"),
+        ),
+      ],
+    ),
+  );
+}
     // hook your add-expense dialog here
   }
 }
