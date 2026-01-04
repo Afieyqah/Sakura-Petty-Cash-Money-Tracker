@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:selab_project/analystic_dashboard/analystic_screen.dart'; // for category colors if needed
+// Pastikan path ini betul mengikut struktur projek anda
+import 'package:selab_project/analystic_dashboard/analystic_screen.dart'; 
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -29,6 +30,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
     "Highest Amount",
     "Lowest Amount",
   ];
+
+  // Map warna kategori (Pastikan ini selaras dengan skrin Analytics anda)
+  final Map<String, Color> categoryColorMap = {
+    "Food": Colors.orange,
+    "Fuel": Colors.blue,
+    "Stationery": Colors.purple,
+    "Transport": Colors.green,
+    "Misc": Colors.grey,
+  };
 
   Future<void> _pickMonth() async {
     final picked = await showDatePicker(
@@ -84,7 +94,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Expense History")),
+      appBar: AppBar(
+        title: const Text("Expense History"),
+        backgroundColor: const Color(0xFFE91E63),
+        foregroundColor: Colors.white,
+      ),
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
@@ -106,22 +120,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   }
 
                   // Convert Firestore docs to List<Map<String, dynamic>>
-                  List<Map<String, dynamic>>
-                  allExpenses = snapshot.data!.docs.map((doc) {
+                  List<Map<String, dynamic>> allExpenses = snapshot.data!.docs.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
                     return {
                       'category': data['category'] ?? 'Misc',
-                      'amount':
-                          double.tryParse(data['amount']?.toString() ?? '0') ??
-                          0.0,
-                      'date': _parseFirestoreDate(data['date'] ?? '01/01/2000'),
+                      'amount': double.tryParse(data['amount']?.toString() ?? '0') ?? 0.0,
+                      // PEMBETULAN: Menghantar data mentah (dynamic) ke parser
+                      'date': _parseFirestoreDate(data['date']),
                     };
                   }).toList();
 
                   final filtered = _filterExpenses(allExpenses);
 
                   if (filtered.isEmpty) {
-                    return const Center(child: Text("No expenses found"));
+                    return Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white70,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text("No expenses found", 
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    );
                   }
 
                   return ListView.builder(
@@ -129,34 +151,39 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
                       final e = filtered[index];
+                      final DateTime date = e['date'];
+                      
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
+                        color: Colors.white.withOpacity(0.9),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor:
-                                categoryColorMap[e['category']]?.withOpacity(
-                                  0.3,
-                                ) ??
-                                Colors.grey.shade300,
+                            backgroundColor: categoryColorMap[e['category']]?.withOpacity(0.2) ?? Colors.grey.shade300,
                             child: Text(
                               (e['category'] as String)[0],
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
+                                color: categoryColorMap[e['category']] ?? Colors.black,
                               ),
                             ),
                           ),
-                          title: Text(e['category'] as String),
+                          title: Text(e['category'] as String, 
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: Text(
-                            "${(e['date'] as DateTime).day.toString().padLeft(2, '0')}/"
-                            "${(e['date'] as DateTime).month.toString().padLeft(2, '0')}/"
-                            "${(e['date'] as DateTime).year}",
+                            "${date.day.toString().padLeft(2, '0')}/"
+                            "${date.month.toString().padLeft(2, '0')}/"
+                            "${date.year}",
                           ),
                           trailing: Text(
                             "RM ${(e['amount'] as double).toStringAsFixed(2)}",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
                       );
@@ -176,7 +203,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
+        color: Colors.white.withOpacity(0.9),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
         boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
       ),
@@ -190,6 +217,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   decoration: const InputDecoration(
                     labelText: "Category",
                     border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10),
                   ),
                   items: categories
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -204,6 +232,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   decoration: const InputDecoration(
                     labelText: "Sort By",
                     border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10),
                   ),
                   items: sortOptions
                       .map((s) => DropdownMenuItem(value: s, child: Text(s)))
@@ -214,30 +243,46 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.calendar_month),
-                  label: Text("${selectedMonth.month}/${selectedMonth.year}"),
-                  onPressed: _pickMonth,
-                ),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.calendar_month),
+              label: Text("Month: ${selectedMonth.month}/${selectedMonth.year}"),
+              onPressed: _pickMonth,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-            ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ---------------- Firestore Date Parser ----------------
-  DateTime _parseFirestoreDate(String raw) {
-    // Expect format: dd/MM/yyyy
-    final parts = raw.split('/');
-    return DateTime(
-      int.parse(parts[2]),
-      int.parse(parts[1]),
-      int.parse(parts[0]),
-    );
+  // ---------------- PEMBETULAN: Firestore Date Parser ----------------
+  DateTime _parseFirestoreDate(dynamic raw) {
+    // 1. Jika data adalah Timestamp (format standard Firestore)
+    if (raw is Timestamp) {
+      return raw.toDate();
+    }
+    
+    // 2. Jika data adalah String (format dd/MM/yyyy)
+    if (raw is String) {
+      try {
+        final parts = raw.split('/');
+        if (parts.length == 3) {
+          return DateTime(
+            int.parse(parts[2]), // Year
+            int.parse(parts[1]), // Month
+            int.parse(parts[0]), // Day
+          );
+        }
+      } catch (e) {
+        debugPrint("Error parsing date string: $e");
+      }
+    }
+    
+    // Default jika data null atau tidak sah
+    return DateTime.now();
   }
 }

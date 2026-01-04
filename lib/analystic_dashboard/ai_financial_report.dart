@@ -1,18 +1,16 @@
-// lib/screens/ai_financial_report_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:selab_project/ai_service.dart'; // make sure the path is correct
+import 'package:selab_project/ai_service.dart';
 
 class AiFinancialReportScreen extends StatefulWidget {
   const AiFinancialReportScreen({super.key});
 
   @override
-  State<AiFinancialReportScreen> createState() =>
-      _AiFinancialReportScreenState();
+  State<AiFinancialReportScreen> createState() => _AiFinancialReportScreenState();
 }
 
 class _AiFinancialReportScreenState extends State<AiFinancialReportScreen> {
-  String report = "Generating report...";
+  String report = "";
   bool loading = true;
 
   @override
@@ -21,56 +19,40 @@ class _AiFinancialReportScreenState extends State<AiFinancialReportScreen> {
     _generateReport();
   }
 
+  // This function now pulls EVERYTHING from Firestore
   Future<void> _generateReport() async {
+    setState(() => loading = true);
     try {
-      final now = DateTime.now();
+      final snapshot = await FirebaseFirestore.instance.collection('expenses').get();
 
-      // 1️⃣ Get all expenses from Firestore
-      final snapshot = await FirebaseFirestore.instance
-          .collection('expenses')
-          .get();
+      if (snapshot.docs.isEmpty) {
+        setState(() {
+          report = "Your expense list is empty. Add some data to get started!";
+          loading = false;
+        });
+        return;
+      }
 
-      // 2️⃣ Convert Firestore docs to usable list
-      final expenses = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
+      // Map all data without date filtering
+      final allExpenses = snapshot.docs.map((doc) {
+        final data = doc.data();
         return {
-          'category': data['category'] ?? 'Misc',
+          'category': (data['category'] ?? 'misc').toString().toLowerCase().trim(),
           'amount': data['amount'].toString(),
-          'date': data['date'] ?? '',
+          'date': data['date'].toString(),
         };
       }).toList();
 
-      // 3️⃣ Filter expenses for this month
-      final thisMonthExpenses = expenses.where((e) {
-        try {
-          final parts = e['date'].split('/');
-          final date = DateTime(
-            int.parse(parts[2]),
-            int.parse(parts[1]),
-            int.parse(parts[0]),
-          );
-          return date.month == now.month && date.year == now.year;
-        } catch (_) {
-          return false;
-        }
-      }).toList();
-
-      // 4️⃣ Generate AI report
       final aiService = AiService();
-      final generatedReport = await aiService.generateMonthlyReport(
-        thisMonthExpenses,
-      );
+      final result = await aiService.generateMonthlyReport(allExpenses);
 
-      // 5️⃣ Update UI
       setState(() {
-        report = generatedReport.isNotEmpty
-            ? generatedReport
-            : "No expenses this month to generate report.";
+        report = result;
         loading = false;
       });
     } catch (e) {
       setState(() {
-        report = "Failed to generate report. Please check your connection.";
+        report = "Error: Could not reach the AI. Check your internet or API key.";
         loading = false;
       });
     }
@@ -79,17 +61,74 @@ class _AiFinancialReportScreenState extends State<AiFinancialReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("AI Financial Report")),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: loading
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                child: Text(
-                  report,
-                  style: const TextStyle(fontSize: 16, height: 1.5),
-                ),
+      appBar: AppBar(
+        title: const Text("Full AI Analysis", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFFE91E63),
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _generateReport, // Manual Refresh
+            tooltip: "Refresh Report",
+          )
+        ],
+      ),
+      body: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.pink.shade50, Colors.white],
+          ),
+        ),
+        child: loading 
+          ? _buildLoadingState() 
+          : _buildReportContent(),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: Color(0xFFE91E63)),
+          SizedBox(height: 20),
+          Text("Consulting your AI Advisor...", 
+            style: TextStyle(color: Colors.pink, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(25),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.insights, color: Colors.pink),
+                  SizedBox(width: 10),
+                  Text("Financial Insights", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
               ),
+              const Divider(height: 30),
+              Text(
+                report,
+                style: const TextStyle(fontSize: 15, height: 1.6, color: Colors.black87),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

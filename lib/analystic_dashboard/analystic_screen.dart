@@ -4,29 +4,31 @@ import 'package:fl_chart/fl_chart.dart';
 import 'monthly_report_screen.dart';
 import 'history_screen.dart';
 
-// Category colors
-final Map<String, Color> categoryColorMap = {
-  "Food": const Color(0xFFBFA2DB),
-  "Fuel": const Color(0xFFFFB37B),
-  "Stationery": const Color(0xFFF3E5AB),
-  "Transport": const Color(0xFFF7C6C7),
-  "Misc": const Color(0xFFFFF3A0),
-};
-
-const double initialPettyCash = 200.0;
-
-class AnalyticsScreen extends StatelessWidget {
+class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
 
-  // ---------------- Parse date from Firestore string ----------------
-  DateTime _parseDate(String raw) {
+  @override
+  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
+}
+
+class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  int touchedIndex = -1;
+  final Color primaryPink = const Color(0xFFE91E63);
+
+  // --- TEMA ALL PINK (Dikutip dari rona Sakura) ---
+  final Map<String, Color> categoryColorMap = {
+    "food": const Color(0xFFFF1744),       // Deep Pink
+    "fuel": const Color(0xFFF06292),       // Light Pink
+    "stationery": const Color(0xFFEC407A), // Medium Pink
+    "transport": const Color(0xFFC2185B),  // Dark Pink
+    "misc": const Color(0xFFF48FB1),       // Soft Pink
+  };
+
+  DateTime _parseDate(dynamic raw) {
+    if (raw is Timestamp) return raw.toDate();
     try {
-      final parts = raw.split('/');
-      return DateTime(
-        int.parse(parts[2]),
-        int.parse(parts[1]),
-        int.parse(parts[0]),
-      );
+      final parts = raw.toString().split('/'); // Format DD/MM/YYYY
+      return DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
     } catch (_) {
       return DateTime.now();
     }
@@ -34,293 +36,253 @@ class AnalyticsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final lastMonth = now.month == 1 ? 12 : now.month - 1;
-    final lastMonthYear = now.month == 1 ? now.year - 1 : now.year;
-
     return Scaffold(
-      appBar: AppBar(title: const Text("Analytics")),
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/cherry_blossom_bg.jpg'),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection('expenses').snapshots(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            // ---------------- Process Firestore Data ----------------
-            double totalThisMonth = 0;
-            double totalLastMonth = 0;
-            Map<int, double> monthlyTotals = {};
-            Map<int, Map<String, double>> monthlyCategoryData = {};
-
-            for (var doc in snapshot.data!.docs) {
-              final data = doc.data() as Map<String, dynamic>;
-              final amount =
-                  double.tryParse(data['amount']?.toString() ?? '0') ?? 0.0;
-              final category = data['category'] ?? 'Misc';
-              final date = _parseDate(data['date'] ?? '01/01/${now.year}');
-
-              // Monthly totals for current year only
-              if (date.year == now.year) {
-                monthlyTotals[date.month] =
-                    (monthlyTotals[date.month] ?? 0) + amount;
-
-                monthlyCategoryData[date.month] ??= {};
-                monthlyCategoryData[date.month]![category] =
-                    (monthlyCategoryData[date.month]![category] ?? 0) + amount;
-              }
-
-              if (date.month == now.month && date.year == now.year)
-                totalThisMonth += amount;
-              if (date.month == lastMonth && date.year == lastMonthYear)
-                totalLastMonth += amount;
-            }
-
-            // Ensure all 12 months exist for trend chart
-            Map<int, double> yearlyTotals = Map.fromIterable(
-              List.generate(12, (index) => index + 1),
-              key: (month) => month,
-              value: (month) => monthlyTotals[month] ?? 0.0,
-            );
-
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _thisMonthOverview(
-                    thisMonthTotal: totalThisMonth,
-                    lastMonthTotal: totalLastMonth,
-                    initialPettyCash: initialPettyCash,
-                    context: context,
-                  ),
-                  const SizedBox(height: 20),
-                  _monthlyTrendPanel(yearlyTotals, context),
-                  const SizedBox(height: 20),
-                  _categoryBreakdownPanel(monthlyCategoryData, now),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  // ---------------- This Month Overview ----------------
-  Widget _thisMonthOverview({
-    required double thisMonthTotal,
-    required double lastMonthTotal,
-    required double initialPettyCash,
-    required BuildContext context,
-  }) {
-    final remaining = initialPettyCash - thisMonthTotal;
-    final percentageChange = lastMonthTotal == 0
-        ? 0
-        : ((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100;
-    final isPositive = percentageChange >= 0;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      extendBodyBehindAppBar: true,
+      body: Stack(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Total Expenses",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "RM ${thisMonthTotal.toStringAsFixed(2)}",
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.pink,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(
-                          isPositive
-                              ? Icons.arrow_upward
-                              : Icons.arrow_downward,
-                          size: 16,
-                          color: isPositive ? Colors.green : Colors.red,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          "${percentageChange.abs().toStringAsFixed(1)}%",
-                          style: TextStyle(
-                            color: isPositive ? Colors.green : Colors.red,
-                            fontWeight: FontWeight.w600,
+          Positioned.fill(
+            child: Image.asset('assets/images/cherry_blossom_bg.jpg', fit: BoxFit.cover),
+          ),
+          
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('accounts').snapshots(),
+            builder: (context, accountSnapshot) {
+              return StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('expenses').snapshots(),
+                builder: (context, expenseSnapshot) {
+                  if (!accountSnapshot.hasData || !expenseSnapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator(color: Colors.pink));
+                  }
+
+                  // 1. KIRA TOTAL BAKI AKAUN (REAL-TIME)
+                  double totalAccountBalance = 0;
+                  for (var doc in accountSnapshot.data!.docs) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    totalAccountBalance += (data['balance'] is num) 
+                        ? (data['balance'] as num).toDouble() 
+                        : double.tryParse(data['balance']?.toString() ?? '0') ?? 0.0;
+                  }
+
+                  // 2. PROSES DATA EXPENSES (FIXED LOGIC)
+                  final now = DateTime.now();
+                  double totalThisMonth = 0;
+                  double totalLastMonth = 0;
+                  Map<String, double> categoryData = {};
+                  Map<int, double> yearlyTotals = {for (var i = 1; i <= 12; i++) i: 0.0};
+
+                  for (var doc in expenseSnapshot.data!.docs) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final amount = (data['amount'] is num) 
+                        ? (data['amount'] as num).toDouble() 
+                        : double.tryParse(data['amount']?.toString() ?? '0') ?? 0.0;
+                    
+                    final category = (data['category'] ?? 'misc').toString().toLowerCase().trim();
+                    final date = _parseDate(data['date']);
+
+                    // Kira trend tahunan (Tahun Semasa)
+                    if (date.year == now.year) {
+                      yearlyTotals[date.month] = (yearlyTotals[date.month] ?? 0) + amount;
+                    }
+
+                    // Kira Bulan Ini
+                    if (date.month == now.month && date.year == now.year) {
+                      totalThisMonth += amount;
+                      categoryData[category] = (categoryData[category] ?? 0) + amount;
+                    }
+                    
+                    // Kira Bulan Lepas
+                    int lastM = now.month == 1 ? 12 : now.month - 1;
+                    int lastY = now.month == 1 ? now.year - 1 : now.year;
+                    if (date.month == lastM && date.year == lastY) {
+                      totalLastMonth += amount;
+                    }
+                  }
+
+                  // 3. REMAINING = BAKI DASHBOARD - EXPENSES BULAN INI
+                  double realTimeRemaining = totalAccountBalance - totalThisMonth;
+
+                  return CustomScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Container(
+                          padding: const EdgeInsets.only(top: 60, bottom: 20),
+                          child: const Center(
+                            child: Text("Analytics",
+                              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white, shadows: [Shadow(blurRadius: 10, color: Colors.black26)])),
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        const Text(
-                          "from last month",
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Container(height: 60, width: 1, color: Colors.grey.shade300),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Remaining",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "RM ${remaining.toStringAsFixed(2)}",
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      "Petty Cash",
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MonthlyReportScreen(),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text("Full Report"),
-            ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                        sliver: SliverList(
+                          delegate: SliverChildListDelegate([
+                            _buildTotalExpenseCard(totalThisMonth, totalLastMonth, realTimeRemaining),
+                            const SizedBox(height: 16),
+                            _buildPieChartCard(categoryData),
+                            const SizedBox(height: 16),
+                            _buildTrendCard(yearlyTotals),
+                          ]),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  // ---------------- Monthly Trend Panel ----------------
-  Widget _monthlyTrendPanel(Map<int, double> data, BuildContext context) {
-    const monthAbbr = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    double maxY = data.isNotEmpty
-        ? data.values.reduce((a, b) => a > b ? a : b) * 1.2
-        : 10;
-
+  // --- CARD 1: OVERVIEW ---
+  Widget _buildTotalExpenseCard(double current, double last, double remaining) {
+    double diff = last == 0 ? 0 : ((current - last) / last) * 100;
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
-      ),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), borderRadius: BorderRadius.circular(24)),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Monthly Expenses Trend",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HistoryScreen()),
+              _buildStatCol("Total Expenses", "RM ${current.toStringAsFixed(2)}", primaryPink),
+              _buildStatCol("Remaining", "RM ${remaining.toStringAsFixed(2)}", Colors.black87),
+            ],
+          ),
+          const Divider(height: 30, thickness: 0.5),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("${diff >= 0 ? '↑' : '↓'} ${diff.abs().toStringAsFixed(1)}% vs last month",
+                style: TextStyle(color: diff >= 0 ? Colors.redAccent : Colors.green, fontWeight: FontWeight.bold, fontSize: 13)),
+              ElevatedButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MonthlyReportScreen())),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryPink, 
+                  foregroundColor: Colors.white, 
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  elevation: 0,
+                ),
+                child: const Text("Full Report", style: TextStyle(fontWeight: FontWeight.bold)),
+              )
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  // --- CARD 2: PIE CHART (ALL PINK) ---
+  Widget _buildPieChartCard(Map<String, double> categories) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), borderRadius: BorderRadius.circular(24)),
+      child: Column(
+        children: [
+          const Text("Category Distribution", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 220,
+            child: PieChart(
+              PieChartData(
+                pieTouchData: PieTouchData(
+                  touchCallback: (event, response) {
+                    if (!event.isInterestedForInteractions || response == null || response.touchedSection == null) {
+                      setState(() => touchedIndex = -1);
+                      return;
+                    }
+                    setState(() => touchedIndex = response.touchedSection!.touchedSectionIndex);
+                  },
+                ),
+                sectionsSpace: 4,
+                centerSpaceRadius: 50,
+                sections: categories.entries.map((e) {
+                  final index = categories.keys.toList().indexOf(e.key);
+                  final isTouched = index == touchedIndex;
+                  return PieChartSectionData(
+                    color: categoryColorMap[e.key] ?? Colors.pink.shade100,
+                    value: e.value,
+                    radius: isTouched ? 70 : 60,
+                    title: isTouched ? '${e.key}\nRM${e.value.toStringAsFixed(0)}' : '',
+                    titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                   );
-                },
-                child: const Text("History"),
+                }).toList(),
+              ),
+            ),
+          ),
+          const Text("Tap segments for details", style: TextStyle(fontSize: 11, color: Colors.grey, fontStyle: FontStyle.italic)),
+        ],
+      ),
+    );
+  }
+
+  // --- CARD 3: TREND (PINK BARS) ---
+  Widget _buildTrendCard(Map<int, double> trend) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), borderRadius: BorderRadius.circular(24)),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Monthly Trend", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen())),
+                child: Text("History", style: TextStyle(color: primaryPink, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 25),
           SizedBox(
             height: 180,
             child: BarChart(
               BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: maxY,
-                barGroups: data.entries
-                    .map(
-                      (e) => BarChartGroupData(
-                        x: e.key,
-                        barRods: [
-                          BarChartRodData(
-                            toY: e.value,
-                            color: Colors.pink,
-                            width: 14,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ],
-                      ),
-                    )
-                    .toList(),
+                maxY: (trend.values.isEmpty || trend.values.reduce((a, b) => a > b ? a : b) == 0) ? 100 : trend.values.reduce((a, b) => a > b ? a : b) * 1.3,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (value) => FlLine(color: Colors.pink.withOpacity(0.05), strokeWidth: 1),
+                ),
+                borderData: FlBorderData(show: false),
                 titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   leftTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+                    sideTitles: SideTitles(
+                      showTitles: true, 
+                      reservedSize: 35, 
+                      getTitlesWidget: (v, m) => Text(v.toInt().toString(), style: const TextStyle(fontSize: 9, color: Colors.grey))
+                    )
                   ),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      getTitlesWidget: (value, meta) =>
-                          (value >= 1 && value <= 12)
-                          ? Text(monthAbbr[value.toInt() - 1])
-                          : const Text(""),
+                      getTitlesWidget: (v, m) {
+                        const months = ['J','F','M','A','M','J','J','A','S','O','N','D'];
+                        if (v < 1 || v > 12) return const SizedBox();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(months[v.toInt()-1], style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.pink)),
+                        );
+                      },
                     ),
                   ),
                 ),
-                borderData: FlBorderData(show: false),
+                barGroups: trend.entries.map((e) => BarChartGroupData(
+                  x: e.key,
+                  barRods: [
+                    BarChartRodData(
+                      toY: e.value, 
+                      color: primaryPink, 
+                      width: 14, 
+                      borderRadius: BorderRadius.circular(6),
+                      backDrawRodData: BackgroundBarChartRodData(show: true, toY: 0, color: Colors.pink.withOpacity(0.05))
+                    )
+                  ],
+                )).toList(),
               ),
             ),
           ),
@@ -329,90 +291,11 @@ class AnalyticsScreen extends StatelessWidget {
     );
   }
 
-  // ---------------- Category Breakdown Panel ----------------
-  Widget _categoryBreakdownPanel(
-    Map<int, Map<String, double>> monthlyCategoryData,
-    DateTime now,
-  ) {
-    final data = monthlyCategoryData[now.month] ?? {};
-    double total = data.values.fold(0, (sum, val) => sum + val);
-    final sortedData = data.entries.toList();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Category Breakdown (This Month)",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: SizedBox(
-                  height: 180,
-                  child: PieChart(
-                    PieChartData(
-                      sections: sortedData
-                          .map(
-                            (e) => PieChartSectionData(
-                              value: e.value,
-                              color: categoryColorMap[e.key] ?? Colors.grey,
-                              title: '',
-                              radius: 50,
-                            ),
-                          )
-                          .toList(),
-                      sectionsSpace: 2,
-                      centerSpaceRadius: 40,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: sortedData.map((e) {
-                    final percent = total == 0 ? 0 : (e.value / total * 100);
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: categoryColorMap[e.key] ?? Colors.grey,
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              "${e.key} (${percent.toStringAsFixed(1)}%)",
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  Widget _buildStatCol(String title, String val, Color col) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+      const SizedBox(height: 4),
+      Text(val, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: col)),
+    ]);
   }
 }
