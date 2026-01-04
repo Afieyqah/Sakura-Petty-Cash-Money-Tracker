@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 import 'login_and_authenthication/auth_service.dart';
-import 'login_and_authenthication/welcome_screen.dart';
 import 'analystic_dashboard/analystic_screen.dart';
 import 'settings/profile_screen.dart';
 import 'budgets/budget_list_screen.dart';
+import '../screens/expense_main_screen.dart'; // Pastikan import ini betul
 
 class DashboardScreen extends StatefulWidget {
   final String role;
@@ -19,7 +20,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final _auth = AuthService();
   int _selectedIndex = 0;
-  final Color themePink = const Color(0xFFE91E63); // Warna pink seragam
+  final Color themePink = const Color(0xFFE91E63);
 
   final tips = [
     "Prepare a Budget and Abide by it",
@@ -77,25 +78,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showUpdateBudgetDialog(double currentBudget) {
-    if (widget.role == "staff") return;
-    final budgetCtrl = TextEditingController(text: currentBudget.toString());
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Set Monthly Budget"),
-        content: TextField(controller: budgetCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Budget Amount (RM)")),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(onPressed: () async {
-            await FirebaseFirestore.instance.collection('settings').doc('budget').set({'amount': double.tryParse(budgetCtrl.text) ?? 0.0});
-            if (mounted) Navigator.pop(context);
-          }, child: const Text("Save")),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
@@ -109,11 +91,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       extendBody: true,
       appBar: AppBar(
-        // Banner warna pink seragam
         backgroundColor: themePink,
         elevation: 4,
         centerTitle: true,
-        title: Text('Dashboard • ${widget.role}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+        title: Text('Dashboard • ${widget.role}', 
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
         actions: [IconButton(onPressed: () => _auth.logout(), icon: const Icon(Icons.logout, color: Colors.white))],
       ),
       body: Container(
@@ -122,10 +104,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         child: pages[_selectedIndex],
       ),
-      // Butang Tambah Bulat Sempurna
       floatingActionButton: SizedBox(
-        height: 65,
-        width: 65,
+        height: 65, width: 65,
         child: FloatingActionButton(
           shape: const CircleBorder(),
           backgroundColor: themePink,
@@ -136,7 +116,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
-        color: themePink, // Warna navigation sama dengan banner
+        color: themePink,
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
         child: SizedBox(
@@ -161,10 +141,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         children: [
           const SizedBox(height: 15),
-          _buildBalanceCard(),
+          _buildBalanceCard(), // Mengambil data dari Koleksi Accounts
           _buildPieChart(),
           _buildTips(),
-          _buildExpenseList(),
+          _buildExpenseList(), // Dengan View All Link
           const SizedBox(height: 100),
         ],
       ),
@@ -172,31 +152,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildBalanceCard() {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('settings').doc('budget').snapshots(),
-      builder: (context, budgetSnap) {
-        double budget = 0;
-        if (budgetSnap.hasData && budgetSnap.data!.exists) budget = _parseAmount(budgetSnap.data!['amount']);
+    final user = FirebaseAuth.instance.currentUser;
+    return StreamBuilder<QuerySnapshot>(
+      // Listen to Accounts for Net Worth
+      stream: FirebaseFirestore.instance.collection('accounts').where('userId', isEqualTo: user?.uid).snapshots(),
+      builder: (context, accountSnap) {
+        double totalNetWorth = 0;
+        if (accountSnap.hasData) {
+          for (var doc in accountSnap.data!.docs) {
+            totalNetWorth += _parseAmount(doc['balance']);
+          }
+        }
+
         return StreamBuilder<QuerySnapshot>(
+          // Listen to Expenses
           stream: FirebaseFirestore.instance.collection('expenses').snapshots(),
-          builder: (context, snap) {
-            double spent = 0;
-            if (snap.hasData) {
-              for (var d in snap.data!.docs) spent += _parseAmount((d.data() as Map)['amount']);
+          builder: (context, expenseSnap) {
+            double totalSpent = 0;
+            if (expenseSnap.hasData) {
+              for (var d in expenseSnap.data!.docs) {
+                totalSpent += _parseAmount((d.data() as Map)['amount']);
+              }
             }
-            final remaining = budget - spent;
-            return GestureDetector(
-              onTap: () => _showUpdateBudgetDialog(budget),
-              child: _card(
-                Column(
-                  children: [
-                    const Text("Available Balance", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 10),
-                    Text("RM ${remaining.toStringAsFixed(2)}", style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: remaining < 0 ? Colors.red : Colors.black87)),
-                    const SizedBox(height: 5),
-                    Text("Total Spent: RM ${spent.toStringAsFixed(2)}", style: const TextStyle(color: Colors.pink, fontWeight: FontWeight.bold)),
-                  ],
-                ),
+            final remaining = totalNetWorth - totalSpent;
+
+            return _card(
+              Column(
+                children: [
+                  const Text("Available Balance (Net Worth - Expenses)", 
+                      style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 12)),
+                  const SizedBox(height: 10),
+                  Text(
+                    "RM ${remaining.toStringAsFixed(2)}",
+                    style: TextStyle(
+                      fontSize: 32, 
+                      fontWeight: FontWeight.w900, 
+                      color: remaining < 0 ? Colors.red : Colors.black87
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text("Net Worth: RM ${totalNetWorth.toStringAsFixed(2)}", 
+                          style: const TextStyle(color: Colors.blueGrey, fontSize: 12)),
+                      const SizedBox(width: 15),
+                      Text("Spent: RM ${totalSpent.toStringAsFixed(2)}", 
+                          style: const TextStyle(color: Colors.pink, fontWeight: FontWeight.bold, fontSize: 12)),
+                    ],
+                  ),
+                ],
               ),
             );
           },
@@ -216,13 +221,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           totals[data['category'] ?? 'Other'] = (totals[data['category']] ?? 0) + _parseAmount(data['amount']);
         }
 
-        // Nuansa Pink Berbeza
         final List<Color> pinkShades = [
-          const Color(0xFFF06292), // Light Pink
-          const Color(0xFFE91E63), // Pink
-          const Color(0xFFC2185B), // Dark Pink
-          const Color(0xFFF48FB1), // Soft Pink
-          const Color(0xFF880E4F), // Deep Pink
+          const Color(0xFFF06292), const Color(0xFFE91E63), const Color(0xFFC2185B), const Color(0xFFF48FB1), const Color(0xFF880E4F),
         ];
 
         return _card(
@@ -269,21 +269,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(padding: EdgeInsets.only(left: 25, top: 15), child: Text("Recent Activity", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+            Padding(
+              padding: const EdgeInsets.only(left: 25, right: 25, top: 15, bottom: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Recent Activity", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ExpenseMainScreen()),
+                      );
+                    },
+                    child: const Text(
+                      "View All",
+                      style: TextStyle(
+                        color: Colors.pink,
+                        decoration: TextDecoration.underline,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: snap.data!.docs.length,
+              itemCount: snap.data!.docs.length > 5 ? 5 : snap.data!.docs.length,
               itemBuilder: (_, i) {
                 final data = snap.data!.docs[i].data() as Map<String, dynamic>;
                 return Container(
                   margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.85), borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)]),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.85), 
+                    borderRadius: BorderRadius.circular(18), 
+                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)]
+                  ),
                   child: ListTile(
                     leading: const CircleAvatar(backgroundColor: Colors.pinkAccent, child: Icon(Icons.receipt_long_rounded, color: Colors.white)),
                     title: Text(data['remark'] ?? 'Expense', style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text(data['category'] ?? 'General'),
-                    trailing: Text("- RM ${_parseAmount(data['amount']).toStringAsFixed(2)}", style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)),
+                    trailing: Text("- RM ${_parseAmount(data['amount']).toStringAsFixed(2)}", 
+                        style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)),
                   ),
                 );
               },
@@ -302,7 +331,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: active ? Colors.white : Colors.white70, size: 28),
-          Text(label, style: TextStyle(color: active ? Colors.white : Colors.white70, fontSize: 10, fontWeight: active ? FontWeight.bold : FontWeight.normal)),
+          Text(label, style: TextStyle(color: active ? Colors.white : Colors.white70, 
+              fontSize: 10, fontWeight: active ? FontWeight.bold : FontWeight.normal)),
         ],
       ),
     );

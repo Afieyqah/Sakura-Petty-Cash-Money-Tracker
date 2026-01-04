@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import '../screens/expense_main_screen.dart';
 
 // --- AUTHENTICATION & DASHBOARD ---
 import 'login_and_authenthication/splash_screen.dart'; 
@@ -50,7 +51,8 @@ class SakuraApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: const SplashScreen(),
       routes: {
-        '/dashboard': (_) => const DashboardScreen(role: 'user'), 
+        '/dashboard': (_) => const DashboardScreen(role: 'user'),
+        '/expense-main': (context) => const ExpenseMainScreen(), 
         '/budget_list': (_) => const BudgetListScreen(),
         '/add-budget': (_) => const AddBudgetScreen(),
         '/view_budget': (_) => const ViewBudgetScreen(),
