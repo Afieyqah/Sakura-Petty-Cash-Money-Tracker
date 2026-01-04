@@ -99,7 +99,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _navIcon(Icons.home, "Home", 0),
             _navIcon(Icons.analytics_outlined, "Stats", 1),
             const SizedBox(width: 40),
-            _navIcon(Icons.list_alt, "Records", 3),
+            _navIcon(Icons.list_alt, "Budgets", 3),
             _navIcon(Icons.person, "Profile", 4),
           ],
         ),
