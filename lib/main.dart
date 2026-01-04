@@ -20,6 +20,7 @@ import 'alerts/alerts_screen.dart';
 import 'settings/profile_screen.dart';
 import 'settings/edit_profile_screen.dart';
 import 'settings/security_screen.dart';
+import 'settings/setting_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,6 +60,7 @@ class SakuraApp extends StatelessWidget {
         '/profile': (_) => const ProfileScreen(),
         '/edit_profile': (_) => const EditProfileScreen(),
         '/security': (_) => const SecurityScreen(),
+        '/settings': (_) => const SettingsScreen(),
       }, // Added missing bracket
     ); // Added missing bracket
   }
