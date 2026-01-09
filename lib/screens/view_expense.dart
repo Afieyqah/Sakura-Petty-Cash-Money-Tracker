@@ -19,7 +19,7 @@ class ViewExpenseScreen extends StatefulWidget {
 class _ViewExpenseScreenState extends State<ViewExpenseScreen> {
   bool _isUploading = false;
 
-  // --- FUNGSI KESELAMATAN TAHAP TINGGI ---
+  // --- FUNGSI PENUKARAN SELAMAT (MENGELAKKAN RALAT SKRIN MERAH) ---
   
   String _safeString(dynamic value, {String fallback = "-"}) {
     if (value == null) return fallback;
@@ -29,11 +29,17 @@ class _ViewExpenseScreenState extends State<ViewExpenseScreen> {
   String _safeDate(dynamic value) {
     if (value == null) return "No Date";
     try {
+      // Jika Firebase bagi Timestamp (Objek)
       if (value is Timestamp) {
         return DateFormat('dd/MM/yyyy').format(value.toDate());
       }
+      // Jika data disimpan sebagai String dalam DB
       if (value is String && value.isNotEmpty) {
-        return value; // Pulangkan string asal (cth: "12/12/2024")
+        return value; 
+      }
+      // Jika data jenis DateTime
+      if (value is DateTime) {
+        return DateFormat('dd/MM/yyyy').format(value);
       }
     } catch (e) {
       return "Invalid Date";
@@ -51,7 +57,7 @@ class _ViewExpenseScreenState extends State<ViewExpenseScreen> {
     return 0.0;
   }
 
-  // --- OCR LOGIC ---
+  // --- OCR LOGIC (Hanya Manager boleh panggil fungsi ini berdasarkan Rules anda) ---
   Future<void> _updateReceipt(ImageSource source) async {
     final picker = ImagePicker();
     final XFile? pickedFile = await picker.pickImage(source: source);
@@ -65,7 +71,6 @@ class _ViewExpenseScreenState extends State<ViewExpenseScreen> {
       final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
 
       String? extractedAmount;
-      String? extractedDate;
 
       for (TextBlock block in recognizedText.blocks) {
         for (TextLine line in block.lines) {
@@ -81,15 +86,21 @@ class _ViewExpenseScreenState extends State<ViewExpenseScreen> {
       String? imageUrl = await CloudinaryService.uploadImage(File(pickedFile.path));
       if (imageUrl == null) throw Exception("Upload failed");
 
+      // PENTING: Jika User adalah STAFF, Rules anda akan halang fungsi .update() ini
       await FirebaseFirestore.instance.collection('expenses').doc(widget.documentId).update({
         'receipt_path': imageUrl,
         'has_receipt': true,
         if (extractedAmount != null) 'amount': extractedAmount,
       });
 
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ Updated!")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ Updated Successfully!")));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ Error: $e")));
+      if (mounted) {
+        String errorMsg = e.toString().contains("permission-denied") 
+            ? "❌ Akses Ditolak: Hanya Manager boleh edit resit." 
+            : "❌ Error: $e";
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg)));
+      }
     } finally {
       textRecognizer.close();
       if (mounted) setState(() => _isUploading = false);
@@ -118,7 +129,6 @@ class _ViewExpenseScreenState extends State<ViewExpenseScreen> {
               if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
               if (!snapshot.hasData || !snapshot.data!.exists) return const Center(child: Text("Data not found"));
 
-              // PENTING: Cast data sebagai Map secara selamat
               final rawData = snapshot.data!.data();
               if (rawData == null) return const Center(child: Text("Empty Data"));
               final data = rawData as Map<String, dynamic>;
@@ -140,6 +150,7 @@ class _ViewExpenseScreenState extends State<ViewExpenseScreen> {
                             const Divider(),
                             _buildInfoRow("Category", _safeString(data['category'])),
                             const Divider(),
+                            // Gunakan _safeDate untuk mengelakkan ralat Timestamp
                             _buildInfoRow("Date", _safeDate(data['date'] ?? data['timestamp'])),
                             const Divider(),
                             _buildInfoRow("Quantity", "${_safeDouble(data['quantity']).toStringAsFixed(0)} ${_safeString(data['unit'], fallback: 'Unit')}"),
@@ -158,7 +169,11 @@ class _ViewExpenseScreenState extends State<ViewExpenseScreen> {
                       onPressed: _showImageSourceActionSheet,
                       icon: const Icon(Icons.upload_file),
                       label: const Text("UPDATE RECEIPT"),
-                      style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.pinkAccent,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 50),
+                      ),
                     )
                   ],
                 ),
@@ -178,7 +193,7 @@ class _ViewExpenseScreenState extends State<ViewExpenseScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
         ],
       ),
     );
@@ -194,19 +209,29 @@ class _ViewExpenseScreenState extends State<ViewExpenseScreen> {
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(15),
-      child: Image.network(url, width: double.infinity, fit: BoxFit.cover),
+      child: Image.network(
+        url, 
+        width: double.infinity, 
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
+        },
+        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50),
+      ),
     );
   }
 
   void _showImageSourceActionSheet() {
     showModalBottomSheet(
       context: context,
-      builder: (ctx) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(leading: const Icon(Icons.camera), title: const Text("Camera"), onTap: () { Navigator.pop(ctx); _updateReceipt(ImageSource.camera); }),
-          ListTile(leading: const Icon(Icons.image), title: const Text("Gallery"), onTap: () { Navigator.pop(ctx); _updateReceipt(ImageSource.gallery); }),
-        ],
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(leading: const Icon(Icons.camera), title: const Text("Camera"), onTap: () { Navigator.pop(ctx); _updateReceipt(ImageSource.camera); }),
+            ListTile(leading: const Icon(Icons.image), title: const Text("Gallery"), onTap: () { Navigator.pop(ctx); _updateReceipt(ImageSource.gallery); }),
+          ],
+        ),
       ),
     );
   }

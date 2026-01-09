@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../screens/bottom_navigation.dart';
+import 'add_budget_screen.dart'; // Pastikan import ini betul
 
 class BudgetListScreen extends StatefulWidget {
   const BudgetListScreen({super.key});
@@ -36,7 +38,6 @@ class _BudgetListScreenState extends State<BudgetListScreen> {
     }
   }
 
-  // --- SOLUSI RALAT DATA: Menukar apa sahaja jenis data (String/num) kepada double ---
   double _convertToDouble(dynamic value) {
     if (value == null) return 0.0;
     if (value is num) return value.toDouble();
@@ -48,6 +49,26 @@ class _BudgetListScreenState extends State<BudgetListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
+      extendBody: true, // Biar background nampak di belakang nav bar
+
+      // --- 1. FAB YANG TELAH DIKEMASKINI KE ADD BUDGET ---
+      floatingActionButton: FloatingActionButton(
+        shape: const CircleBorder(),
+        backgroundColor: Colors.white,
+        elevation: 8,
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddBudgetScreen()),
+          );
+        },
+        child: const Icon(Icons.add, size: 35, color: Color(0xFFE91E63)),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+
+      // --- 2. BOTTOM NAVIGATION BAR ---
+      bottomNavigationBar: const SharedNavigation(),
+
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -70,6 +91,7 @@ class _BudgetListScreenState extends State<BudgetListScreen> {
                     final allExpenses = expSnap.data?.docs ?? [];
 
                     return CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
                       slivers: [
                         SliverAppBar(
                           floating: false,
@@ -81,25 +103,17 @@ class _BudgetListScreenState extends State<BudgetListScreen> {
                           title: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // --- SOLUSI BLACKOUT: Gunakan Navigator.pop ---
                               IconButton(
                                 icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-                                onPressed: () {
-                                  if (Navigator.canPop(context)) {
-                                    Navigator.pop(context);
-                                  } else {
-                                    // Fallback jika stack kosong
-                                    Navigator.pushReplacementNamed(context, '/dashboard');
-                                  }
-                                },
+                                onPressed: () => Navigator.pop(context),
                               ),
                               const Text(
-                                "BUDGET",
+                                "BUDGET LIST",
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
-                                  fontSize: 22,
-                                  letterSpacing: 1.5,
+                                  fontSize: 20,
+                                  letterSpacing: 1.2,
                                 ),
                               ),
                               IconButton(
@@ -110,35 +124,12 @@ class _BudgetListScreenState extends State<BudgetListScreen> {
                           ),
                         ),
 
-                        if (_userRole != 'Staff')
-                          SliverToBoxAdapter(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Colors.pink.withOpacity(0.8),
-                                borderRadius: const BorderRadius.only(
-                                  bottomLeft: Radius.circular(20),
-                                  bottomRight: Radius.circular(20),
-                                ),
-                              ),
-                              child: GestureDetector(
-                                onTap: () => Navigator.pushNamed(context, '/add-budget'),
-                                child: const Text(
-                                  "Add Budget",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    decoration: TextDecoration.underline,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                        // Tambah padding di atas list supaya tak rapat sangat dengan AppBar
+                        SliverToBoxAdapter(child: const SizedBox(height: 10)),
 
                         SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                          // Padding bawah 120 supaya item terakhir tidak tenggelam bawah nav bar
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
                           sliver: SliverList(
                             delegate: SliverChildBuilderDelegate(
                               (context, index) {
@@ -146,24 +137,19 @@ class _BudgetListScreenState extends State<BudgetListScreen> {
                                   return _buildStyledBudgetCard(budgetSnap.data!.docs[index], allExpenses);
                                 }
                                 
+                                // Butang Analisis di penghujung senarai
                                 return Padding(
-                                  padding: const EdgeInsets.only(top: 10, bottom: 50),
+                                  padding: const EdgeInsets.only(top: 15, bottom: 20),
                                   child: Center(
-                                    child: GestureDetector(
-                                      onTap: () => Navigator.pushNamed(context, '/budget_chart'),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(colors: [Colors.pinkAccent, Colors.pink]),
-                                          borderRadius: BorderRadius.circular(25),
-                                          boxShadow: [
-                                            BoxShadow(color: Colors.pink.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5)),
-                                          ],
-                                        ),
-                                        child: const Text(
-                                          "VIEW ANALYSIS",
-                                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                        ),
+                                    child: ElevatedButton.icon(
+                                      onPressed: () => Navigator.pushNamed(context, '/budget_chart'),
+                                      icon: const Icon(Icons.analytics_outlined),
+                                      label: const Text("VIEW BUDGET ANALYSIS"),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.pink,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                                       ),
                                     ),
                                   ),
@@ -186,15 +172,13 @@ class _BudgetListScreenState extends State<BudgetListScreen> {
   Widget _buildStyledBudgetCard(DocumentSnapshot bDoc, List<DocumentSnapshot> expenses) {
     final Map<String, dynamic> bData = bDoc.data() as Map<String, dynamic>;
     final String category = bData['category'] ?? 'General';
-    
-    // Paksa tukar ke double untuk elak ralat num?
     final double budgetLimit = _convertToDouble(bData['amount']);
     
+    // Kira total spent untuk kategori ini
     double totalSpent = 0;
-
     for (var expDoc in expenses) {
       final expData = expDoc.data() as Map<String, dynamic>;
-      if (expData['category'] == category) {
+      if (expData['category'].toString().toLowerCase() == category.toLowerCase()) {
         totalSpent += _convertToDouble(expData['amount']);
       }
     }
@@ -209,7 +193,9 @@ class _BudgetListScreenState extends State<BudgetListScreen> {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.95),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,32 +203,53 @@ class _BudgetListScreenState extends State<BudgetListScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(category.toUpperCase(), style: const TextStyle(color: Colors.pink, fontWeight: FontWeight.bold, fontSize: 14)),
-              Text("RM ${budgetLimit.toStringAsFixed(2)}", style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+              Text(category.toUpperCase(), 
+                style: const TextStyle(color: Colors.pink, fontWeight: FontWeight.bold, fontSize: 14)),
+              Text("Limit: RM ${budgetLimit.toStringAsFixed(2)}", 
+                style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
             ],
           ),
           const SizedBox(height: 12),
+          // Progress Bar
           Stack(
             children: [
-              Container(height: 8, width: double.infinity, decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(5))),
+              Container(
+                height: 10, 
+                width: double.infinity, 
+                decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(5))
+              ),
               FractionallySizedBox(
                 widthFactor: progressFactor,
                 child: Container(
-                  height: 8, 
+                  height: 10, 
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: isOverBudget ? [Colors.red, Colors.redAccent] : [Colors.pinkAccent, Colors.pink]),
+                    gradient: LinearGradient(
+                      colors: isOverBudget 
+                        ? [Colors.red, Colors.orange] 
+                        : [Colors.pinkAccent, Colors.pink]
+                    ),
                     borderRadius: BorderRadius.circular(5)
                   )
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Spent: RM ${totalSpent.toStringAsFixed(2)}", style: const TextStyle(fontSize: 11, color: Colors.black54)),
-              Text("${(progress * 100).toStringAsFixed(0)}%", style: TextStyle(color: isOverBudget ? Colors.red : Colors.pink, fontSize: 11, fontWeight: FontWeight.bold)),
+              Text("Spent: RM ${totalSpent.toStringAsFixed(2)}", 
+                style: TextStyle(
+                  fontSize: 12, 
+                  color: isOverBudget ? Colors.red : Colors.black54,
+                  fontWeight: isOverBudget ? FontWeight.bold : FontWeight.normal
+                )),
+              Text("${(progress * 100).toStringAsFixed(0)}%", 
+                style: TextStyle(
+                  color: isOverBudget ? Colors.red : Colors.pink, 
+                  fontSize: 12, 
+                  fontWeight: FontWeight.bold
+                )),
             ],
           ),
         ],
